@@ -78,20 +78,20 @@ export default class JitsiLocalTrack extends JitsiTrack {
         this.sourceId = sourceId;
         this.sourceType = sourceType;
 
-        // if (browser.usesNewGumFlow()) {
-        //     // Get the resolution from the track itself because it cannot be
-        //     // certain which resolution webrtc has fallen back to using.
-        //     this.resolution = track.getSettings().height;
-        //
-        //     // Cache the constraints of the track in case of any this track
-        //     // model needs to call getUserMedia again, such as when unmuting.
-        //     this._constraints = track.getConstraints();
-        // } else {
+        if (browser.usesNewGumFlow()) {
+            // Get the resolution from the track itself because it cannot be
+            // certain which resolution webrtc has fallen back to using.
+            this.resolution = track.getSettings().height;
+
+            // Cache the constraints of the track in case of any this track
+            // model needs to call getUserMedia again, such as when unmuting.
+            this._constraints = track.getConstraints();
+        } else {
             // FIXME Currently, Firefox is ignoring our constraints about
             // resolutions so we do not store it, to avoid wrong reporting of
             // local track resolution.
             this.resolution = browser.isFirefox() ? null : resolution;
-        // }
+        }
 
         this.deviceId = deviceId;
 
@@ -409,30 +409,29 @@ export default class JitsiLocalTrack extends JitsiTrack {
                 facingMode: this.getCameraFacingMode()
             };
 
-            // if (browser.usesNewGumFlow()) {
-            //     promise
-            //         = RTCUtils.newObtainAudioAndVideoPermissions(Object.assign(
-            //             {},
-            //             streamOptions,
-            //             { constraints: { video: this._constraints } }));
-            // } else {
+            if (browser.usesNewGumFlow()) {
+                promise
+                    = RTCUtils.newObtainAudioAndVideoPermissions(Object.assign(
+                        {},
+                        streamOptions,
+                        { constraints: { video: this._constraints } }));
+            } else {
                 if (this.resolution) {
                     streamOptions.resolution = this.resolution;
                 }
 
                 promise
                     = RTCUtils.obtainAudioAndVideoPermissions(streamOptions);
-            // }
+            }
 
             promise.then(streamsInfo => {
                 const mediaType = this.getType();
-                // const streamInfo
-                //     = browser.usesNewGumFlow()
-                //         ? streamsInfo.find(
-                //             info => info.track.kind === mediaType)
-                //         : streamsInfo.find(
-                //             info => info.mediaType === mediaType);
-                const streamInfo = streamsInfo.find(info => info.mediaType === mediaType);
+                const streamInfo
+                    = browser.usesNewGumFlow()
+                        ? streamsInfo.find(
+                            info => info.track.kind === mediaType)
+                        : streamsInfo.find(
+                            info => info.mediaType === mediaType);
 
                 if (streamInfo) {
                     this._setStream(streamInfo.stream);

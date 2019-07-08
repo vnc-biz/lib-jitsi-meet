@@ -377,6 +377,8 @@ export default _mergeNamespaceAndModule({
                 return tracks;
             })
             .catch(error => {
+                console.error("ERROR RTC.obtainAudioAndVideoPermissions", error);
+
                 promiseFulfilled = true;
 
                 if (error.name === JitsiTrackErrors.UNSUPPORTED_RESOLUTION

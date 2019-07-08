@@ -280,19 +280,19 @@ export default class BrowserCapabilities extends BrowserDetection {
      * @returns {boolean}
      */
     usesNewGumFlow() {
-        const REQUIRED_CHROME_VERSION = 61;
-
-        if (this.isChrome()) {
-            return !this.isVersionLessThan(REQUIRED_CHROME_VERSION);
-        }
-
-        if (this.isFirefox() || this.isSafariWithWebrtc()) {
-            return true;
-        }
-
-        if (this.isChromiumBased()) {
-            return this._getChromiumBasedVersion() >= REQUIRED_CHROME_VERSION;
-        }
+        // const REQUIRED_CHROME_VERSION = 61;
+        //
+        // if (this.isChrome()) {
+        //     return !this.isVersionLessThan(REQUIRED_CHROME_VERSION);
+        // }
+        //
+        // if (this.isFirefox() || this.isSafariWithWebrtc()) {
+        //     return true;
+        // }
+        //
+        // if (this.isChromiumBased()) {
+        //     return this._getChromiumBasedVersion() >= REQUIRED_CHROME_VERSION;
+        // }
 
         return false;
     }

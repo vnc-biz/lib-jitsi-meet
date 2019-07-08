@@ -258,8 +258,7 @@ export default class RTC extends Listenable {
      * @returns {*} Promise object that will receive the new JitsiTracks
      */
     static obtainAudioAndVideoPermissions(options) {
-        // const usesNewGumFlow = browser.usesNewGumFlow();
-        const usesNewGumFlow  = false;
+        const usesNewGumFlow = browser.usesNewGumFlow();
         const obtainMediaPromise = usesNewGumFlow
             ? RTCUtils.newObtainAudioAndVideoPermissions(options)
             : RTCUtils.obtainAudioAndVideoPermissions(options);
