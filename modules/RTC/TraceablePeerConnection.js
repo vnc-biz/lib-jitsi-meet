@@ -582,21 +582,16 @@ TraceablePeerConnection.prototype._remoteStreamAdded = function(stream) {
         return;
     }
 
-    let self = this
-
-
-    setTimeout(function(stream) {
-        console.log("_remoteStreamAdded setTimeout", stream);
-
-        // // Bind 'addtrack'/'removetrack' event handlers
-        // if (browser.isChromiumBased() || browser.isEdge()) {
-        //     stream.onaddtrack = event => {
-        //         this._remoteTrackAdded(stream, event.track);
-        //     };
-        //     stream.onremovetrack = event => {
-        //         this._remoteTrackRemoved(stream, event.track);
-        //     };
-        // }
+    let _addRemoteTracks =  function(stream, self) {
+        // Bind 'addtrack'/'removetrack' event handlers
+        if (browser.isChromiumBased() || browser.isEdge()) {
+            stream.onaddtrack = event => {
+                self._remoteTrackAdded(stream, event.track);
+            };
+            stream.onremovetrack = event => {
+                self._remoteTrackRemoved(stream, event.track);
+            };
+        }
 
         // Call remoteTrackAdded for each track in the stream
         const streamAudioTracks = stream.getAudioTracks();
@@ -609,7 +604,16 @@ TraceablePeerConnection.prototype._remoteStreamAdded = function(stream) {
         for (const videoTrack of streamVideoTracks) {
             self._remoteTrackAdded(stream, videoTrack);
         }
-    }, 300, stream);
+    }
+
+    if (browser.isCordovaiOS()) {
+        let self = this;
+        setTimeout(function(stream) {
+            _addRemoteTracks(stream, self)
+        }, 300, stream);
+    } else {
+        _addRemoteTracks(stream, this)
+    }
 };
 
 
@@ -626,11 +630,13 @@ TraceablePeerConnection.prototype._remoteTrackAdded = function(stream, track) {
     let streamId = RTC.getStreamID(stream);
     const mediaType = track.kind;
 
-    // not sure why but
-    // we have f43cc560-9ed1-4fcc-af1c-ee974bd132d6-3-895EB0B4-85C7-46B3-A062-6FA7AE1C1D92 as stream id
-    // but in sdp we have a bit diff
-    // a=ssrc:4092510797 msid:f43cc560-9ed1-4fcc-af1c-ee974bd132d6-3 d5fff09b-cd88-4cc2-a4c7-3f52aec2b88f-3
-    streamId = streamId.substring(0, 38);
+    if (browser.isCordovaiOS()) {
+        // not sure why but
+        // we have f43cc560-9ed1-4fcc-af1c-ee974bd132d6-3-895EB0B4-85C7-46B3-A062-6FA7AE1C1D92 as stream id
+        // but in sdp we have a bit diff
+        // a=ssrc:4092510797 msid:f43cc560-9ed1-4fcc-af1c-ee974bd132d6-3 d5fff09b-cd88-4cc2-a4c7-3f52aec2b88f-3
+        streamId = streamId.substring(0, 38);
+    }
 
     console.log(`_remoteTrackAdded:`, streamId, mediaType);
 

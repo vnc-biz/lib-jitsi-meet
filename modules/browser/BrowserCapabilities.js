@@ -88,6 +88,11 @@ export default class BrowserCapabilities extends BrowserDetection {
             && !this.isVersionLessThan('12.1');
     }
 
+    isCordovaiOS() {
+        console.log("isCordovaiOS", window.cordova, window.webkitMediaStream);
+        return window.cordova && window.webkitMediaStream;
+    }
+
     /**
      * Checks if the current browser is supported.
      *
@@ -253,20 +258,21 @@ export default class BrowserCapabilities extends BrowserDetection {
      * @returns {boolean}
      */
     usesUnifiedPlan() {
-        console.log("usesUnifiedPlan this.isFirefox()", this.isFirefox());
-        console.log("usesUnifiedPlan this.isSafariWithVP8()", this.isSafariWithVP8());
+        if (this.isCordovaiOS()) {
+            return false;
+        }
 
-        // if (this.isFirefox()) {
-        //     return true;
-        // }
-        //
-        // if (this.isSafariWithVP8()) {
-        //     // eslint-disable-next-line max-len
-        //     // https://trac.webkit.org/changeset/236144/webkit/trunk/LayoutTests/webrtc/video-addLegacyTransceiver.html
-        //     // eslint-disable-next-line no-undef
-        //     return Object.keys(RTCRtpTransceiver.prototype)
-        //            .indexOf('currentDirection') > -1;
-        // }
+        if (this.isFirefox()) {
+            return true;
+        }
+
+        if (this.isSafariWithVP8()) {
+            // eslint-disable-next-line max-len
+            // https://trac.webkit.org/changeset/236144/webkit/trunk/LayoutTests/webrtc/video-addLegacyTransceiver.html
+            // eslint-disable-next-line no-undef
+            return Object.keys(RTCRtpTransceiver.prototype)
+                   .indexOf('currentDirection') > -1;
+        }
 
         return false;
     }
@@ -280,19 +286,23 @@ export default class BrowserCapabilities extends BrowserDetection {
      * @returns {boolean}
      */
     usesNewGumFlow() {
-        // const REQUIRED_CHROME_VERSION = 61;
-        //
-        // if (this.isChrome()) {
-        //     return !this.isVersionLessThan(REQUIRED_CHROME_VERSION);
-        // }
-        //
-        // if (this.isFirefox() || this.isSafariWithWebrtc()) {
-        //     return true;
-        // }
-        //
-        // if (this.isChromiumBased()) {
-        //     return this._getChromiumBasedVersion() >= REQUIRED_CHROME_VERSION;
-        // }
+        if (this.isCordovaiOS()) {
+            return false;
+        }
+
+        const REQUIRED_CHROME_VERSION = 61;
+
+        if (this.isChrome()) {
+            return !this.isVersionLessThan(REQUIRED_CHROME_VERSION);
+        }
+
+        if (this.isFirefox() || this.isSafariWithWebrtc()) {
+            return true;
+        }
+
+        if (this.isChromiumBased()) {
+            return this._getChromiumBasedVersion() >= REQUIRED_CHROME_VERSION;
+        }
 
         return false;
     }

@@ -703,21 +703,25 @@ function handleLocalStream(streams, resolution) {
 function defaultSetVideoSrc(element, stream) {
     console.log("defaultSetVideoSrc stream", stream, element.srcObject);
 
-    // // srcObject
-    // let srcObjectPropertyName = 'srcObject';
-    //
-    // if (!(srcObjectPropertyName in element)) {
-    //     srcObjectPropertyName = 'mozSrcObject';
-    //     if (!(srcObjectPropertyName in element)) {
-    //         srcObjectPropertyName = null;
-    //     }
-    // }
-    //
-    // if (srcObjectPropertyName) {
-    //     element[srcObjectPropertyName] = stream;
-    //
-    //     return;
-    // }
+    // srcObject
+    if (!browser.isCordovaiOS()) {
+        // by some reason, a 'srcObject' does not work under Cordova iOSRTC plugin, so we should use 'src'
+
+        let srcObjectPropertyName = 'srcObject';
+
+        if (!(srcObjectPropertyName in element)) {
+            srcObjectPropertyName = 'mozSrcObject';
+            if (!(srcObjectPropertyName in element)) {
+                srcObjectPropertyName = null;
+            }
+        }
+
+        if (srcObjectPropertyName) {
+            element[srcObjectPropertyName] = stream;
+
+            return;
+        }
+    }
 
     // src
     let src;
@@ -731,8 +735,6 @@ function defaultSetVideoSrc(element, stream) {
             stream.jitsiObjectURL = src = URL.createObjectURL(stream);
         }
     }
-
-    console.log("defaultSetVideoSrc src ", src);
 
     element.src = src || '';
 }
@@ -787,20 +789,20 @@ class RTCUtils extends Listenable {
 
 
 
-        // if (browser.c) {
-        //     this.RTCPeerConnectionType = RTCPeerConnection;
-        //
-        //     this.attachMediaStream
-        //         = wrapAttachMediaStream((element, stream) => {
-        //             if (element) {
-        //                 element.srcObject = stream;
-        //             }
-        //         });
-        //
-        //     this.getStreamID = ({ id }) => id;
-        //     this.getTrackID = ({ id }) => id;
-        // } else if (browser.isChromiumBased() // this is chrome < 61
-        //         || browser.isReactNative()) {
+        if (browser.usesNewGumFlow()) {
+            this.RTCPeerConnectionType = RTCPeerConnection;
+
+            this.attachMediaStream
+                = wrapAttachMediaStream((element, stream) => {
+                    if (element) {
+                        element.srcObject = stream;
+                    }
+                });
+
+            this.getStreamID = ({ id }) => id;
+            this.getTrackID = ({ id }) => id;
+        } else if (browser.isChromiumBased() // this is chrome < 61
+                || browser.isReactNative() || browser.isCordovaiOS()) {
 
             this.RTCPeerConnectionType = RTCPeerConnection;
 
@@ -836,12 +838,12 @@ class RTCUtils extends Listenable {
                     return this.audioTracks;
                 };
             }
-        // } else {
-        //     const message = 'Endpoint does not appear to be WebRTC-capable';
-        //
-        //     logger.error(message);
-        //     throw new Error(message);
-        // }
+        } else {
+            const message = 'Endpoint does not appear to be WebRTC-capable';
+
+            logger.error(message);
+            throw new Error(message);
+        }
 
         this._initPCConstraints(options);
 
