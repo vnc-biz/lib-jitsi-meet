@@ -571,6 +571,7 @@ export default class JingleSessionPC extends JingleSession {
             return;
         }
 
+        logger.log('sendIceCandidates', candidates);
         const cand = $iq({ to: this.remoteJid,
             type: 'set' })
             .c('jingle', { xmlns: 'urn:xmpp:jingle:1',
