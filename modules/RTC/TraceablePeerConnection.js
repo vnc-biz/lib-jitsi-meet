@@ -672,7 +672,6 @@ TraceablePeerConnection.prototype._remoteTrackAdded = function(stream, track) {
 
     ssrcLines
         = ssrcLines.filter(line => line.indexOf(`msid:${streamId}`) !== -1);
-
     if (!ssrcLines.length) {
         GlobalOnErrorHandler.callErrorHandler(
             new Error(
@@ -770,7 +769,7 @@ TraceablePeerConnection.prototype._createRemoteTrack = function(
 
         return;
     } else if (existingTrack) {
-        logger.info(
+        logger.error(
             `${this} overwriting remote track for`
                 + `${ownerEndpointId} ${mediaType}`);
     }
@@ -1107,7 +1106,6 @@ const normalizePlanB = function(desc) {
                     if (typeof group.semantics !== 'undefined'
                         && group.semantics === 'FID') {
                         if (typeof group.ssrcs !== 'undefined') {
-                            console.log("SPLIT normalizePlanB", group.ssrcs);
                             firstSsrcs.push(Number(group.ssrcs.split(' ')[0]));
                         }
                     }
@@ -1333,7 +1331,7 @@ const getters = {
     remoteDescription() {
         let desc = this.peerconnection.remoteDescription;
 
-         this.trace('getRemoteDescription::preTransform', dumpSDP(desc));
+        this.trace('getRemoteDescription::preTransform', dumpSDP(desc));
 
         // if we're running on FF, transform to Plan B first.
         if (browser.usesUnifiedPlan()) {
@@ -1811,7 +1809,7 @@ TraceablePeerConnection.prototype.setLocalDescription = function(description) {
     return new Promise((resolve, reject) => {
         this.peerconnection.setLocalDescription(localSdp)
             .then(() => {
-                this.trace('setLocalDescriptionOnSuccess localSdp');
+                this.trace('setLocalDescriptionOnSuccess');
                 const localUfrag = SDPUtil.getUfrag(localSdp.sdp);
 
                 if (localUfrag !== this.localUfrag) {
@@ -1821,7 +1819,7 @@ TraceablePeerConnection.prototype.setLocalDescription = function(description) {
                 }
                 resolve();
             }, err => {
-                 this.trace('setLocalDescriptionOnFailure', err);
+                this.trace('setLocalDescriptionOnFailure', err);
                 this.eventEmitter.emit(
                     RTCEvents.SET_LOCAL_DESCRIPTION_FAILED,
                     err, this);
@@ -1950,14 +1948,13 @@ TraceablePeerConnection.prototype.setRemoteDescription = function(description) {
     // Safari WebRTC errors when no supported video codec is found in the offer.
     // To prevent the error, inject H264 into the video mLine.
     if (browser.isSafariWithWebrtc() && !browser.isSafariWithVP8()) {
-        console.log('Maybe injecting H264 into the remote description');
+        logger.debug('Maybe injecting H264 into the remote description');
 
         // eslint-disable-next-line no-param-reassign
         description = this._injectH264IfNotPresent(description);
     }
 
     return new Promise((resolve, reject) => {
-        console.log('pre setRemoteDescription');
         this.peerconnection.setRemoteDescription(description)
             .then(() => {
                 this.trace('setRemoteDescriptionOnSuccess');
@@ -2221,7 +2218,7 @@ TraceablePeerConnection.prototype._createOfferOrAnswer = function(
         constraints) {
     const logName = isOffer ? 'Offer' : 'Answer';
 
-    console.log(`create${logName}`, JSON.stringify(constraints, null, ' '));
+    this.trace(`create${logName}`, JSON.stringify(constraints, null, ' '));
 
     const handleSuccess = (resultSdp, resolveFn, rejectFn) => {
         try {

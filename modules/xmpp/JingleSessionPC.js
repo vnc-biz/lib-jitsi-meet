@@ -1207,8 +1207,6 @@ export default class JingleSessionPC extends JingleSession {
                 sid: this.sid
             });
 
-            console.log("SPLIT sendTransportAccept");
-
         localSDP.media.forEach((medialines, idx) => {
             const mline = SDPUtil.parseMLine(medialines.split('\r\n')[0]);
 
