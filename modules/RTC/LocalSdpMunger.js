@@ -183,7 +183,6 @@ export default class LocalSdpMunger {
                 break;
             case 'msid': {
                 if (ssrcLine.value) {
-                    console.log("SPLIT _transformMediaIdentifiers ");
                     const streamAndTrackIDs = ssrcLine.value.split(' ');
 
                     if (streamAndTrackIDs.length === 2) {

@@ -275,8 +275,6 @@ export default class JitsiTrack extends EventEmitter {
      * @returns {void}
      */
     attach(container) {
-        console.log("attach container", container);
-        console.log("attach stream", this.stream);
         if (this.stream) {
             RTCUtils.attachMediaStream(container, this.stream);
         }

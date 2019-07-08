@@ -701,8 +701,6 @@ function handleLocalStream(streams, resolution) {
  * source/src of <tt>element</tt>
  */
 function defaultSetVideoSrc(element, stream) {
-    console.log("defaultSetVideoSrc stream", stream, element.srcObject);
-
     // srcObject
     if (!browser.isCordovaiOS()) {
         // by some reason, a 'srcObject' does not work under Cordova iOSRTC plugin, so we should use 'src'
@@ -735,7 +733,6 @@ function defaultSetVideoSrc(element, stream) {
             stream.jitsiObjectURL = src = URL.createObjectURL(stream);
         }
     }
-
     element.src = src || '';
 }
 
@@ -787,8 +784,6 @@ class RTCUtils extends Listenable {
 
         this.enumerateDevices = initEnumerateDevicesWithCallback();
 
-
-
         if (browser.usesNewGumFlow()) {
             this.RTCPeerConnectionType = RTCPeerConnection;
 
@@ -814,7 +809,6 @@ class RTCUtils extends Listenable {
                 });
 
             this.getStreamID = function({ id }) {
-                console.log("getStreamID");
                 // A. MediaStreams from FF endpoints have the characters '{' and
                 // '}' that make jQuery choke.
                 // B. The react-native-webrtc implementation that we use at the

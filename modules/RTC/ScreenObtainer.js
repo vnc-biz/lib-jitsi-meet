@@ -372,7 +372,6 @@ function getWebStoreInstallUrl(options) {
  * @returns {boolean}
  */
 function isUpdateRequired(minVersion, extVersion) {
-    console.log("SPLIT isUpdateRequired ");
     try {
         const s1 = minVersion.split('.');
         const s2 = extVersion.split('.');
