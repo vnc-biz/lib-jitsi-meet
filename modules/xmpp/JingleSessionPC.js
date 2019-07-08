@@ -571,7 +571,7 @@ export default class JingleSessionPC extends JingleSession {
             return;
         }
 
-        logger.log('sendIceCandidates', candidates);
+        console.log('sendIceCandidates', candidates);
         const cand = $iq({ to: this.remoteJid,
             type: 'set' })
             .c('jingle', { xmlns: 'urn:xmpp:jingle:1',
@@ -583,6 +583,7 @@ export default class JingleSessionPC extends JingleSession {
 
         for (let mid = 0; mid < localSDP.media.length; mid++) {
             const cands = candidates.filter(el => el.sdpMLineIndex === mid);
+                console.log("SPLIT sendIceCandidates ");
             const mline
                 = SDPUtil.parseMLine(localSDP.media[mid].split('\r\n')[0]);
 
@@ -1208,6 +1209,8 @@ export default class JingleSessionPC extends JingleSession {
                 sid: this.sid
             });
 
+            console.log("SPLIT sendTransportAccept");
+
         localSDP.media.forEach((medialines, idx) => {
             const mline = SDPUtil.parseMLine(medialines.split('\r\n')[0]);
 
@@ -1535,6 +1538,7 @@ export default class JingleSessionPC extends JingleSession {
      *  in removeSsrcInfo
      */
     _processRemoteRemoveSource(removeSsrcInfo) {
+        console.log("SPLIT _processRemoteRemoveSource");
         const remoteSdp = new SDP(this.peerconnection.remoteDescription.sdp);
 
         removeSsrcInfo.forEach((lines, idx) => {

@@ -150,7 +150,8 @@ export default class BrowserCapabilities extends BrowserDetection {
      * @return {boolean}
      */
     supportsMediaStreamConstructor() {
-        return !this.isReactNative();
+        // return !this.isReactNative();
+        return false;
     }
 
     /**
@@ -252,17 +253,20 @@ export default class BrowserCapabilities extends BrowserDetection {
      * @returns {boolean}
      */
     usesUnifiedPlan() {
-        if (this.isFirefox()) {
-            return true;
-        }
+        console.log("usesUnifiedPlan this.isFirefox()", this.isFirefox());
+        console.log("usesUnifiedPlan this.isSafariWithVP8()", this.isSafariWithVP8());
 
-        if (this.isSafariWithVP8()) {
-            // eslint-disable-next-line max-len
-            // https://trac.webkit.org/changeset/236144/webkit/trunk/LayoutTests/webrtc/video-addLegacyTransceiver.html
-            // eslint-disable-next-line no-undef
-            return Object.keys(RTCRtpTransceiver.prototype)
-                   .indexOf('currentDirection') > -1;
-        }
+        // if (this.isFirefox()) {
+        //     return true;
+        // }
+        //
+        // if (this.isSafariWithVP8()) {
+        //     // eslint-disable-next-line max-len
+        //     // https://trac.webkit.org/changeset/236144/webkit/trunk/LayoutTests/webrtc/video-addLegacyTransceiver.html
+        //     // eslint-disable-next-line no-undef
+        //     return Object.keys(RTCRtpTransceiver.prototype)
+        //            .indexOf('currentDirection') > -1;
+        // }
 
         return false;
     }

@@ -555,6 +555,7 @@ const SDPUtil = {
      * @param {string} sdp the SDP in raw text format
      */
     getUfrag(sdp) {
+        console.log("getUfrag ", sdp);
         const ufragLines
             = sdp.split('\n').filter(line => line.startsWith('a=ice-ufrag:'));
 

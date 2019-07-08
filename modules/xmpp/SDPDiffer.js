@@ -148,6 +148,8 @@ SDPDiffer.prototype.getNewMedia = function() {
  * TODO: document!
  */
 SDPDiffer.prototype.toJingle = function(modify) {
+        console.log("SPLIT SDPDiffer toJingle ");
+
     const sdpMediaSsrcs = this.getNewMedia();
 
     let modified = false;

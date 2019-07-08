@@ -570,6 +570,8 @@ TraceablePeerConnection.prototype.getSsrcByTrackId = function(id) {
  * @param {MediaStream} stream the WebRTC MediaStream for remote participant
  */
 TraceablePeerConnection.prototype._remoteStreamAdded = function(stream) {
+    console.log("_remoteStreamAdded");
+
     const streamId = RTC.getStreamID(stream);
 
     if (!RTC.isUserStreamById(streamId)) {
@@ -580,27 +582,34 @@ TraceablePeerConnection.prototype._remoteStreamAdded = function(stream) {
         return;
     }
 
-    // Bind 'addtrack'/'removetrack' event handlers
-    if (browser.isChromiumBased() || browser.isEdge()) {
-        stream.onaddtrack = event => {
-            this._remoteTrackAdded(stream, event.track);
-        };
-        stream.onremovetrack = event => {
-            this._remoteTrackRemoved(stream, event.track);
-        };
-    }
+    let self = this
 
-    // Call remoteTrackAdded for each track in the stream
-    const streamAudioTracks = stream.getAudioTracks();
 
-    for (const audioTrack of streamAudioTracks) {
-        this._remoteTrackAdded(stream, audioTrack);
-    }
-    const streamVideoTracks = stream.getVideoTracks();
+    setTimeout(function(stream) {
+        console.log("_remoteStreamAdded setTimeout", stream);
 
-    for (const videoTrack of streamVideoTracks) {
-        this._remoteTrackAdded(stream, videoTrack);
-    }
+        // // Bind 'addtrack'/'removetrack' event handlers
+        // if (browser.isChromiumBased() || browser.isEdge()) {
+        //     stream.onaddtrack = event => {
+        //         this._remoteTrackAdded(stream, event.track);
+        //     };
+        //     stream.onremovetrack = event => {
+        //         this._remoteTrackRemoved(stream, event.track);
+        //     };
+        // }
+
+        // Call remoteTrackAdded for each track in the stream
+        const streamAudioTracks = stream.getAudioTracks();
+
+        for (const audioTrack of streamAudioTracks) {
+            self._remoteTrackAdded(stream, audioTrack);
+        }
+        const streamVideoTracks = stream.getVideoTracks();
+
+        for (const videoTrack of streamVideoTracks) {
+            self._remoteTrackAdded(stream, videoTrack);
+        }
+    }, 300, stream);
 };
 
 
@@ -614,10 +623,16 @@ TraceablePeerConnection.prototype._remoteStreamAdded = function(stream) {
  * participant
  */
 TraceablePeerConnection.prototype._remoteTrackAdded = function(stream, track) {
-    const streamId = RTC.getStreamID(stream);
+    let streamId = RTC.getStreamID(stream);
     const mediaType = track.kind;
 
-    logger.info(`${this} remote track added:`, streamId, mediaType);
+    // not sure why but
+    // we have f43cc560-9ed1-4fcc-af1c-ee974bd132d6-3-895EB0B4-85C7-46B3-A062-6FA7AE1C1D92 as stream id
+    // but in sdp we have a bit diff
+    // a=ssrc:4092510797 msid:f43cc560-9ed1-4fcc-af1c-ee974bd132d6-3 d5fff09b-cd88-4cc2-a4c7-3f52aec2b88f-3
+    streamId = streamId.substring(0, 38);
+
+    console.log(`_remoteTrackAdded:`, streamId, mediaType);
 
     // look up an associated JID for a stream id
     if (!mediaType) {
@@ -634,6 +649,8 @@ TraceablePeerConnection.prototype._remoteTrackAdded = function(stream, track) {
     const mediaLines
         = remoteSDP.media.filter(mls => mls.startsWith(`m=${mediaType}`));
 
+    console.log(`_remoteTrackAdded mediaLines:`, mediaLines);
+
     if (!mediaLines.length) {
         GlobalOnErrorHandler.callErrorHandler(
             new Error(
@@ -642,13 +659,21 @@ TraceablePeerConnection.prototype._remoteTrackAdded = function(stream, track) {
                     streamId}`));
 
         // Abort
+        console.log("_remoteTrackAdded return 1");
         return;
     }
 
+    console.log(`_remoteTrackAdded mediaLines[0]:`, mediaLines[0]);
+
     let ssrcLines = SDPUtil.findLines(mediaLines[0], 'a=ssrc:');
+
+    console.log(`_remoteTrackAdded ssrcLines1:`, ssrcLines);
 
     ssrcLines
         = ssrcLines.filter(line => line.indexOf(`msid:${streamId}`) !== -1);
+
+    console.log("_remoteTrackAdded ssrcLines2", ssrcLines);
+
     if (!ssrcLines.length) {
         GlobalOnErrorHandler.callErrorHandler(
             new Error(
@@ -656,11 +681,13 @@ TraceablePeerConnection.prototype._remoteTrackAdded = function(stream, track) {
                     streamId} for remote track, media type: ${mediaType}`));
 
         // Abort
+        console.log("_remoteTrackAdded return 2");
         return;
     }
 
     // FIXME the length of ssrcLines[0] not verified, but it will fail
     // with global error handler anyway
+    console.log("SPLIT _remoteTrackAdded", ssrcLines[0].substring(7));
     const ssrcStr = ssrcLines[0].substring(7).split(' ')[0];
     const trackSsrc = Number(ssrcStr);
     const ownerEndpointId = this.signalingLayer.getSSRCOwner(trackSsrc);
@@ -672,6 +699,7 @@ TraceablePeerConnection.prototype._remoteTrackAdded = function(stream, track) {
                     streamId} media type: ${mediaType}`));
 
         // Abort
+        console.log("_remoteTrackAdded return 3");
         return;
     } else if (!ownerEndpointId) {
         GlobalOnErrorHandler.callErrorHandler(
@@ -730,6 +758,8 @@ TraceablePeerConnection.prototype._createRemoteTrack = function(
         muted) {
     let remoteTracksMap = this.remoteTracks.get(ownerEndpointId);
 
+    console.log("_createRemoteTrack");
+
     if (!remoteTracksMap) {
         remoteTracksMap = new Map();
         this.remoteTracks.set(ownerEndpointId, remoteTracksMap);
@@ -740,13 +770,13 @@ TraceablePeerConnection.prototype._createRemoteTrack = function(
     if (existingTrack && existingTrack.getTrack() === track) {
         // Ignore duplicated event which can originate either from
         // 'onStreamAdded' or 'onTrackAdded'.
-        logger.info(
+        console.log(
             `${this} ignored duplicated remote track added event for: `
                 + `${ownerEndpointId}, ${mediaType}`);
 
         return;
     } else if (existingTrack) {
-        logger.error(
+        console.log(
             `${this} overwriting remote track for`
                 + `${ownerEndpointId} ${mediaType}`);
     }
@@ -766,6 +796,7 @@ TraceablePeerConnection.prototype._createRemoteTrack = function(
 
     remoteTracksMap.set(mediaType, remoteTrack);
 
+    console.log("_createRemoteTrack emit RTCEvents.REMOTE_TRACK_ADDED", remoteTrack);
     this.eventEmitter.emit(RTCEvents.REMOTE_TRACK_ADDED, remoteTrack);
 };
 
@@ -959,6 +990,7 @@ TraceablePeerConnection.prototype._removeRemoteTrackById = function(
  * @return {Map<string,TrackSSRCInfo>}
  */
 function extractSSRCMap(desc) {
+    console.log('extractSSRCMap: desc', desc);
     /**
      * Track SSRC infos mapped by stream ID (msid)
      * @type {Map<string,TrackSSRCInfo>}
@@ -973,7 +1005,7 @@ function extractSSRCMap(desc) {
 
     if (typeof desc !== 'object' || desc === null
         || typeof desc.sdp !== 'string') {
-        logger.warn('An empty description was passed as an argument.');
+        logger.warn('extractSSRCMap: An empty description was passed as an argument.');
 
         return ssrcMap;
     }
@@ -994,6 +1026,7 @@ function extractSSRCMap(desc) {
                 if (typeof group.semantics !== 'undefined'
                     && typeof group.ssrcs !== 'undefined') {
                     // Parse SSRCs and store as numbers
+                    console.log("SPLIT extractSSRCMap", group.ssrcs);
                     const groupSSRCs
                         = group.ssrcs.split(' ').map(
                             ssrcStr => parseInt(ssrcStr, 10));
@@ -1051,9 +1084,11 @@ function extractSSRCMap(desc) {
  * only SSRCs.
  */
 const normalizePlanB = function(desc) {
+    console.log('normalizePlanB: desc', desc);
+
     if (typeof desc !== 'object' || desc === null
         || typeof desc.sdp !== 'string') {
-        logger.warn('An empty description was passed as an argument.');
+        logger.warn('normalizePlanB: An empty description was passed as an argument.');
 
         return desc;
     }
@@ -1083,6 +1118,7 @@ const normalizePlanB = function(desc) {
                     if (typeof group.semantics !== 'undefined'
                         && group.semantics === 'FID') {
                         if (typeof group.ssrcs !== 'undefined') {
+                            console.log("SPLIT normalizePlanB", group.ssrcs);
                             firstSsrcs.push(Number(group.ssrcs.split(' ')[0]));
                         }
                     }
@@ -1308,7 +1344,7 @@ const getters = {
     remoteDescription() {
         let desc = this.peerconnection.remoteDescription;
 
-        this.trace('getRemoteDescription::preTransform', dumpSDP(desc));
+        console.log('getRemoteDescription::preTransform', dumpSDP(desc));
 
         // if we're running on FF, transform to Plan B first.
         if (browser.usesUnifiedPlan()) {
@@ -1786,7 +1822,7 @@ TraceablePeerConnection.prototype.setLocalDescription = function(description) {
     return new Promise((resolve, reject) => {
         this.peerconnection.setLocalDescription(localSdp)
             .then(() => {
-                this.trace('setLocalDescriptionOnSuccess');
+                console.log('setLocalDescriptionOnSuccess localSdp', JSON.stringify(localSdp));
                 const localUfrag = SDPUtil.getUfrag(localSdp.sdp);
 
                 if (localUfrag !== this.localUfrag) {
@@ -1796,7 +1832,7 @@ TraceablePeerConnection.prototype.setLocalDescription = function(description) {
                 }
                 resolve();
             }, err => {
-                this.trace('setLocalDescriptionOnFailure', err);
+                console.log('setLocalDescriptionOnFailure', err);
                 this.eventEmitter.emit(
                     RTCEvents.SET_LOCAL_DESCRIPTION_FAILED,
                     err, this);
@@ -1869,7 +1905,10 @@ TraceablePeerConnection.prototype._insertUnifiedPlanSimulcastReceive
     };
 
 TraceablePeerConnection.prototype.setRemoteDescription = function(description) {
-    this.trace('setRemoteDescription::preTransform', dumpSDP(description));
+    // this.trace('setRemoteDescription::preTransform', dumpSDP(description));
+
+
+    console.log('setRemoteDescription', dumpSDP(description))
 
     // TODO the focus should squeze or explode the remote simulcast
     // eslint-disable-next-line no-param-reassign
@@ -1890,6 +1929,8 @@ TraceablePeerConnection.prototype.setRemoteDescription = function(description) {
             sdp: transform.write(parsedSdp)
         });
     }
+
+    console.log('usesUnifiedPlan', browser.usesUnifiedPlan())
 
     // If the browser uses unified plan, transform to it first
     if (browser.usesUnifiedPlan()) {
@@ -1925,16 +1966,21 @@ TraceablePeerConnection.prototype.setRemoteDescription = function(description) {
     // Safari WebRTC errors when no supported video codec is found in the offer.
     // To prevent the error, inject H264 into the video mLine.
     if (browser.isSafariWithWebrtc() && !browser.isSafariWithVP8()) {
-        logger.debug('Maybe injecting H264 into the remote description');
+        console.log('Maybe injecting H264 into the remote description');
 
         // eslint-disable-next-line no-param-reassign
         description = this._injectH264IfNotPresent(description);
     }
 
     return new Promise((resolve, reject) => {
+        console.log('pre setRemoteDescription');
         this.peerconnection.setRemoteDescription(description)
             .then(() => {
-                this.trace('setRemoteDescriptionOnSuccess');
+
+                let desc = this.peerconnection.remoteDescription;
+                console.log('setRemoteDescriptionOnSuccess', dumpSDP(desc));
+
+
                 const remoteUfrag = SDPUtil.getUfrag(description.sdp);
 
                 if (remoteUfrag !== this.remoteUfrag) {
@@ -1944,7 +1990,7 @@ TraceablePeerConnection.prototype.setRemoteDescription = function(description) {
                 }
                 resolve();
             }, err => {
-                this.trace('setRemoteDescriptionOnFailure', err);
+                console.log('setRemoteDescriptionOnFailure', err);
                 this.eventEmitter.emit(
                     RTCEvents.SET_REMOTE_DESCRIPTION_FAILED,
                     err,
@@ -1984,6 +2030,7 @@ TraceablePeerConnection.prototype._injectH264IfNotPresent = function(
     }
 
     const { fmtp, payloads, rtp } = videoMLine;
+    console.log("SPLIT _injectH264IfNotPresent", payloads.toString());
     const payloadsArray = payloads.toString().split(' ');
     let dummyPayloadType;
 
@@ -2195,7 +2242,7 @@ TraceablePeerConnection.prototype._createOfferOrAnswer = function(
         constraints) {
     const logName = isOffer ? 'Offer' : 'Answer';
 
-    this.trace(`create${logName}`, JSON.stringify(constraints, null, ' '));
+    console.log(`create${logName}`, JSON.stringify(constraints, null, ' '));
 
     const handleSuccess = (resultSdp, resolveFn, rejectFn) => {
         try {
@@ -2273,6 +2320,8 @@ TraceablePeerConnection.prototype._createOfferOrAnswer = function(
 
             // Fix the setup attribute (see _fixAnswerRFC4145Setup for
             //  details)
+
+            console.log("!isOffer");
             if (!isOffer) {
                 const remoteDescription
                     = new SDP(this.remoteDescription.sdp);

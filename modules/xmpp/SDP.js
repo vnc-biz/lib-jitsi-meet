@@ -7,6 +7,7 @@ import SDPUtil from './SDPUtil';
  * @param sdp
  */
 export default function SDP(sdp) {
+    console.log("SPLIT SDP ", sdp);
     const media = sdp.split('\r\nm=');
 
     for (let i = 1, length = media.length; i < length; i++) {
@@ -48,6 +49,8 @@ SDP.prototype.removeUdpCandidates = false;
  * Returns map of MediaChannel mapped per channel idx.
  */
 SDP.prototype.getMediaSsrcMap = function() {
+        console.log("SPLIT getMediaSsrcMap ");
+
     const self = this;
     const mediaSSRCs = {};
     let tmp;
@@ -120,6 +123,8 @@ SDP.prototype.containsSSRC = function(ssrc) {
 
 // remove iSAC and CN from SDP
 SDP.prototype.mangle = function() {
+    console.log("SPLIT mangle ");
+
     let i, j, lines, mline, newdesc, rtpmap;
 
     for (i = 0; i < this.media.length; i++) {
@@ -176,6 +181,8 @@ SDP.prototype.removeMediaLines = function(mediaindex, prefix) {
 
 // add content's to a jingle element
 SDP.prototype.toJingle = function(elem, thecreator) {
+        console.log("SPLIT toJingle ");
+
     let i, j, k, lines, mline, rtpmap, ssrc, tmp;
 
     // new bundle plan

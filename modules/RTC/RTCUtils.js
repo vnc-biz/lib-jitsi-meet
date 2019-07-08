@@ -701,20 +701,23 @@ function handleLocalStream(streams, resolution) {
  * source/src of <tt>element</tt>
  */
 function defaultSetVideoSrc(element, stream) {
-    // srcObject
-    let srcObjectPropertyName = 'srcObject';
+    console.log("defaultSetVideoSrc stream", stream, element.srcObject);
 
-    if (!(srcObjectPropertyName in element)) {
-        srcObjectPropertyName = 'mozSrcObject';
-        if (!(srcObjectPropertyName in element)) {
-            srcObjectPropertyName = null;
-        }
-    }
-    if (srcObjectPropertyName) {
-        element[srcObjectPropertyName] = stream;
-
-        return;
-    }
+    // // srcObject
+    // let srcObjectPropertyName = 'srcObject';
+    //
+    // if (!(srcObjectPropertyName in element)) {
+    //     srcObjectPropertyName = 'mozSrcObject';
+    //     if (!(srcObjectPropertyName in element)) {
+    //         srcObjectPropertyName = null;
+    //     }
+    // }
+    //
+    // if (srcObjectPropertyName) {
+    //     element[srcObjectPropertyName] = stream;
+    //
+    //     return;
+    // }
 
     // src
     let src;
@@ -728,6 +731,9 @@ function defaultSetVideoSrc(element, stream) {
             stream.jitsiObjectURL = src = URL.createObjectURL(stream);
         }
     }
+
+    console.log("defaultSetVideoSrc src ", src);
+
     element.src = src || '';
 }
 
@@ -779,20 +785,22 @@ class RTCUtils extends Listenable {
 
         this.enumerateDevices = initEnumerateDevicesWithCallback();
 
-        if (browser.usesNewGumFlow()) {
-            this.RTCPeerConnectionType = RTCPeerConnection;
 
-            this.attachMediaStream
-                = wrapAttachMediaStream((element, stream) => {
-                    if (element) {
-                        element.srcObject = stream;
-                    }
-                });
 
-            this.getStreamID = ({ id }) => id;
-            this.getTrackID = ({ id }) => id;
-        } else if (browser.isChromiumBased() // this is chrome < 61
-                || browser.isReactNative()) {
+        // if (browser.c) {
+        //     this.RTCPeerConnectionType = RTCPeerConnection;
+        //
+        //     this.attachMediaStream
+        //         = wrapAttachMediaStream((element, stream) => {
+        //             if (element) {
+        //                 element.srcObject = stream;
+        //             }
+        //         });
+        //
+        //     this.getStreamID = ({ id }) => id;
+        //     this.getTrackID = ({ id }) => id;
+        // } else if (browser.isChromiumBased() // this is chrome < 61
+        //         || browser.isReactNative()) {
 
             this.RTCPeerConnectionType = RTCPeerConnection;
 
@@ -804,6 +812,7 @@ class RTCUtils extends Listenable {
                 });
 
             this.getStreamID = function({ id }) {
+                console.log("getStreamID");
                 // A. MediaStreams from FF endpoints have the characters '{' and
                 // '}' that make jQuery choke.
                 // B. The react-native-webrtc implementation that we use at the
@@ -827,12 +836,12 @@ class RTCUtils extends Listenable {
                     return this.audioTracks;
                 };
             }
-        } else {
-            const message = 'Endpoint does not appear to be WebRTC-capable';
-
-            logger.error(message);
-            throw new Error(message);
-        }
+        // } else {
+        //     const message = 'Endpoint does not appear to be WebRTC-capable';
+        //
+        //     logger.error(message);
+        //     throw new Error(message);
+        // }
 
         this._initPCConstraints(options);
 
