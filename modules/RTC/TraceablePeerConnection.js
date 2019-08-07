@@ -654,7 +654,7 @@ TraceablePeerConnection.prototype._remoteTrackAdded = function(stream, track) {
     }
 
     const remoteSDP = new SDP(this.remoteDescription.sdp);
-    const mediaLines
+    let mediaLines
         = remoteSDP.media.filter(mls => mls.startsWith(`m=${mediaType}`));
 
     if (!mediaLines.length) {
@@ -673,13 +673,22 @@ TraceablePeerConnection.prototype._remoteTrackAdded = function(stream, track) {
     ssrcLines
         = ssrcLines.filter(line => line.indexOf(`msid:${streamId}`) !== -1);
     if (!ssrcLines.length) {
-        GlobalOnErrorHandler.callErrorHandler(
-            new Error(
-                `No SSRC lines for streamId ${
-                    streamId} for remote track, media type: ${mediaType}`));
+        if (browser.isCordovaiOS()) {
+            // by some reason, it could be a situation where a video track will be part of 'm=audio'
+            mediaLines = remoteSDP.media.filter(mls => mls.startsWith(`m=audio`));
+            ssrcLines = SDPUtil.findLines(mediaLines[0], 'a=ssrc:');
+            ssrcLines = ssrcLines.filter(line => line.indexOf(`msid:${streamId}`) !== -1);
+        }
+        
+        if (!ssrcLines.length) {
+            GlobalOnErrorHandler.callErrorHandler(
+                new Error(
+                    `No SSRC lines for streamId ${
+                        streamId} for remote track, media type: ${mediaType}`));
 
-        // Abort
-        return;
+            // Abort
+            return;
+        }
     }
 
     // FIXME the length of ssrcLines[0] not verified, but it will fail
