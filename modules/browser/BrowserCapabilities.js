@@ -44,7 +44,7 @@ export default class BrowserCapabilities extends BrowserDetection {
      * otherwise.
      */
     supportsP2P() {
-        return !this.isEdge() && !this.isFirefox();
+        return !this.isEdge() && !this.isFirefox() && !this.isSafariWithVP8();
     }
 
     /**

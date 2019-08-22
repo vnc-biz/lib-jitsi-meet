@@ -235,7 +235,19 @@ export default function TraceablePeerConnection(
         }
     };
     this.peerconnection.onaddstream
-        = event => this._remoteStreamAdded(event.stream);
+        = event => {
+            if (!browser.isSafari()) {
+                this._remoteStreamAdded(event.stream)
+            }
+        };
+    this.peerconnection.ontrack
+        = event => {
+            if (browser.isSafari()) {
+                event.streams.forEach(stream => {
+                    this._remoteStreamAdded(stream)
+                });
+            }
+        };
     this.peerconnection.onremovestream
         = event => this._remoteStreamRemoved(event.stream);
     this.onsignalingstatechange = null;
@@ -679,7 +691,7 @@ TraceablePeerConnection.prototype._remoteTrackAdded = function(stream, track) {
             ssrcLines = SDPUtil.findLines(mediaLines[0], 'a=ssrc:');
             ssrcLines = ssrcLines.filter(line => line.indexOf(`msid:${streamId}`) !== -1);
         }
-        
+
         if (!ssrcLines.length) {
             GlobalOnErrorHandler.callErrorHandler(
                 new Error(
