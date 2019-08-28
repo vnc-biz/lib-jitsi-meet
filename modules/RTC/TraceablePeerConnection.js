@@ -236,13 +236,13 @@ export default function TraceablePeerConnection(
     };
     this.peerconnection.onaddstream
         = event => {
-            if (!browser.isSafari()) {
+            if (!browser.isSafari() || browser.isCordovaiOS()) {
                 this._remoteStreamAdded(event.stream)
             }
         };
     this.peerconnection.ontrack
         = event => {
-            if (browser.isSafari()) {
+            if (browser.isSafari() && !browser.isCordovaiOS()) {
                 event.streams.forEach(stream => {
                     this._remoteStreamAdded(stream)
                 });
