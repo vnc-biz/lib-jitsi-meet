@@ -702,23 +702,19 @@ function handleLocalStream(streams, resolution) {
  */
 function defaultSetVideoSrc(element, stream) {
     // srcObject
-    if (!browser.isCordovaiOS()) {
-        // by some reason, a 'srcObject' does not work under Cordova iOSRTC plugin, so we should use 'src'
+    let srcObjectPropertyName = 'srcObject';
 
-        let srcObjectPropertyName = 'srcObject';
-
+    if (!(srcObjectPropertyName in element)) {
+        srcObjectPropertyName = 'mozSrcObject';
         if (!(srcObjectPropertyName in element)) {
-            srcObjectPropertyName = 'mozSrcObject';
-            if (!(srcObjectPropertyName in element)) {
-                srcObjectPropertyName = null;
-            }
+            srcObjectPropertyName = null;
         }
+    }
 
-        if (srcObjectPropertyName) {
-            element[srcObjectPropertyName] = stream;
+    if (srcObjectPropertyName) {
+        element[srcObjectPropertyName] = stream;
 
-            return;
-        }
+        return;
     }
 
     // src

@@ -89,8 +89,9 @@ export default class BrowserCapabilities extends BrowserDetection {
     }
 
     isCordovaiOS() {
-        console.log("isCordovaiOS", window.cordova, window.webkitMediaStream);
-        return window.cordova && window.webkitMediaStream;
+        var isCord = !!(window.cordova && window.webkitMediaStream);
+        // console.log("isCordovaiOS", isCord);
+        return isCord
     }
 
     /**
