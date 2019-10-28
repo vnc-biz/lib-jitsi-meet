@@ -710,7 +710,6 @@ function defaultSetVideoSrc(element, stream) {
             srcObjectPropertyName = null;
         }
     }
-
     if (srcObjectPropertyName) {
         element[srcObjectPropertyName] = stream;
 

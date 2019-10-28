@@ -156,9 +156,6 @@ export default class BrowserCapabilities extends BrowserDetection {
      * @return {boolean}
      */
     supportsMediaStreamConstructor() {
-        // if (this.isCordovaiOS()) {
-        //     return false;
-        // }
         return !this.isReactNative();
     }
 

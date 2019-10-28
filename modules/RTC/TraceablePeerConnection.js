@@ -642,17 +642,10 @@ TraceablePeerConnection.prototype._remoteStreamAdded = function(stream) {
  * participant
  */
 TraceablePeerConnection.prototype._remoteTrackAdded = function(stream, track) {
-    let streamId = RTC.getStreamID(stream);
+    const streamId = RTC.getStreamID(stream);
     const mediaType = track.kind;
 
-    console.log(`${this} remote track added:`, streamId, mediaType);
-    // if (browser.isCordovaiOS()) {
-    //     // not sure why but
-    //     // we have f43cc560-9ed1-4fcc-af1c-ee974bd132d6-3-895EB0B4-85C7-46B3-A062-6FA7AE1C1D92 as stream id
-    //     // but in sdp we have a bit diff
-    //     // a=ssrc:4092510797 msid:f43cc560-9ed1-4fcc-af1c-ee974bd132d6-3 d5fff09b-cd88-4cc2-a4c7-3f52aec2b88f-3
-    //     streamId = streamId.substring(0, 38);
-    // }
+    logger.info(`${this} remote track added:`, streamId, mediaType);
 
     // look up an associated JID for a stream id
     if (!mediaType) {
@@ -666,7 +659,7 @@ TraceablePeerConnection.prototype._remoteTrackAdded = function(stream, track) {
     }
 
     const remoteSDP = new SDP(this.remoteDescription.sdp);
-    let mediaLines
+    const mediaLines
         = remoteSDP.media.filter(mls => mls.startsWith(`m=${mediaType}`));
 
     if (!mediaLines.length) {
@@ -684,24 +677,14 @@ TraceablePeerConnection.prototype._remoteTrackAdded = function(stream, track) {
 
     ssrcLines
         = ssrcLines.filter(line => line.indexOf(`msid:${streamId}`) !== -1);
-    console.log("Jitsi ssrcLines", ssrcLines);
     if (!ssrcLines.length) {
-        // if (browser.isCordovaiOS()) {
-        //     // by some reason, it could be a situation where a video track will be part of 'm=audio'
-        //     mediaLines = remoteSDP.media.filter(mls => mls.startsWith(`m=audio`));
-        //     ssrcLines = SDPUtil.findLines(mediaLines[0], 'a=ssrc:');
-        //     ssrcLines = ssrcLines.filter(line => line.indexOf(`msid:${streamId}`) !== -1);
-        // }
+        GlobalOnErrorHandler.callErrorHandler(
+            new Error(
+                `No SSRC lines for streamId ${
+                    streamId} for remote track, media type: ${mediaType}`));
 
-        // if (!ssrcLines.length) {
-            GlobalOnErrorHandler.callErrorHandler(
-                new Error(
-                    `No SSRC lines for streamId ${
-                        streamId} for remote track, media type: ${mediaType}`));
-
-            // Abort
-            return;
-        // }
+        // Abort
+        return;
     }
 
     // FIXME the length of ssrcLines[0] not verified, but it will fail
@@ -729,7 +712,7 @@ TraceablePeerConnection.prototype._remoteTrackAdded = function(stream, track) {
         return;
     }
 
-    console.log(`${this} associated ssrc`, ownerEndpointId, trackSsrc);
+    logger.log(`${this} associated ssrc`, ownerEndpointId, trackSsrc);
 
     const peerMediaInfo
         = this.signalingLayer.getPeerMediaInfo(ownerEndpointId, mediaType);
@@ -774,8 +757,6 @@ TraceablePeerConnection.prototype._createRemoteTrack = function(
         ssrc,
         muted) {
     let remoteTracksMap = this.remoteTracks.get(ownerEndpointId);
-
-    console.log("Jitsi _createRemoteTrack");
 
     if (!remoteTracksMap) {
         remoteTracksMap = new Map();
