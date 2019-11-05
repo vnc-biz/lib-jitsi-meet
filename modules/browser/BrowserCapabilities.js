@@ -335,7 +335,7 @@ export default class BrowserCapabilities extends BrowserDetection {
      * @returns {boolean}
      */
     supportsSdpSemantics() {
-        return this.isChromiumBased() && this._getChromiumBasedVersion() >= 65;
+        return this.isCordovaiOS() || (this.isChromiumBased() && this._getChromiumBasedVersion() >= 65);
     }
 
     /**
