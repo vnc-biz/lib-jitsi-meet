@@ -627,7 +627,7 @@ TraceablePeerConnection.prototype._remoteStreamAdded = function(stream) {
 
     let _addRemoteTracks =  function(stream, self) {
         // Bind 'addtrack'/'removetrack' event handlers
-        if (browser.isChromiumBased() || browser.isEdge() || browser.isCordovaiOS()) {
+        if (browser.isChromiumBased() || browser.isCordovaiOS()) {
             stream.onaddtrack = event => {
                 self._remoteTrackAdded(stream, event.track);
             };
