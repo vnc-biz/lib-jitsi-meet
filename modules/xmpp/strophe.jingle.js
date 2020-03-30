@@ -25,7 +25,7 @@ const logger = getLogger(__filename);
 /**
  *
  */
-class JingleConnectionPlugin extends ConnectionPlugin {
+export default class JingleConnectionPlugin extends ConnectionPlugin {
     /**
      * Creates new <tt>JingleConnectionPlugin</tt>
      * @param {XMPP} xmpp
@@ -196,7 +196,7 @@ class JingleConnectionPlugin extends ConnectionPlugin {
             break;
         }
         case 'transport-replace':
-            logger.info('(TIME) Start transport replace', now);
+            logger.info('(TIME) Start transport replace:\t', now);
             Statistics.sendAnalytics(createJingleEvent(
                 ACTION_JINGLE_TR_RECEIVED,
                 {
@@ -207,7 +207,7 @@ class JingleConnectionPlugin extends ConnectionPlugin {
             sess.replaceTransport($(iq).find('>jingle'), () => {
                 const successTime = window.performance.now();
 
-                logger.info('(TIME) Transport replace success!', successTime);
+                logger.info('(TIME) Transport replace success:\t', successTime);
                 Statistics.sendAnalytics(createJingleEvent(
                     ACTION_JINGLE_TR_SUCCESS,
                     {
@@ -312,15 +312,15 @@ class JingleConnectionPlugin extends ConnectionPlugin {
 
                     switch (type) {
                     case 'stun':
-                        dict.url = `stun:${el.attr('host')}`;
+                        dict.urls = `stun:${el.attr('host')}`;
                         if (el.attr('port')) {
-                            dict.url += `:${el.attr('port')}`;
+                            dict.urls += `:${el.attr('port')}`;
                         }
                         iceservers.push(dict);
                         break;
                     case 'turn':
                     case 'turns': {
-                        dict.url = `${type}:`;
+                        dict.urls = `${type}:`;
                         const username = el.attr('username');
 
                         // https://code.google.com/p/webrtc/issues/detail
@@ -332,22 +332,22 @@ class JingleConnectionPlugin extends ConnectionPlugin {
                                     /Chrom(e|ium)\/([0-9]+)\./);
 
                             if (match && parseInt(match[2], 10) < 28) {
-                                dict.url += `${username}@`;
+                                dict.urls += `${username}@`;
                             } else {
                                 // only works in M28
                                 dict.username = username;
                             }
                         }
-                        dict.url += el.attr('host');
+                        dict.urls += el.attr('host');
                         const port = el.attr('port');
 
                         if (port) {
-                            dict.url += `:${el.attr('port')}`;
+                            dict.urls += `:${el.attr('port')}`;
                         }
                         const transport = el.attr('transport');
 
                         if (transport && transport !== 'udp') {
-                            dict.url += `?transport=${transport}`;
+                            dict.urls += `?transport=${transport}`;
                         }
 
                         dict.credential = el.attr('password')
@@ -364,7 +364,7 @@ class JingleConnectionPlugin extends ConnectionPlugin {
                     // we want to filter and leave only tcp/turns candidates
                     // which make sense for the jvb connections
                     this.jvbIceConfig.iceServers
-                        = iceservers.filter(s => s.url.startsWith('turns'));
+                        = iceservers.filter(s => s.urls.startsWith('turns'));
                 }
 
                 if (options.p2p && options.p2p.useStunTurn) {
@@ -404,15 +404,3 @@ class JingleConnectionPlugin extends ConnectionPlugin {
 }
 
 /* eslint-enable newline-per-chained-call */
-
-/**
- *
- * @param XMPP
- * @param eventEmitter
- * @param iceConfig
- */
-export default function initJingle(XMPP, eventEmitter, iceConfig) {
-    Strophe.addConnectionPlugin(
-        'jingle',
-        new JingleConnectionPlugin(XMPP, eventEmitter, iceConfig));
-}

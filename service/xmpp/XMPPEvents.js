@@ -29,8 +29,6 @@ const XMPPEvents = {
     // The conference properties (as advertised by jicofo) have changed
     CONFERENCE_PROPERTIES_CHANGED: 'xmpp.conference_properties_changed',
 
-    CONFERENCE_SETUP_FAILED: 'xmpp.conference_setup_failed',
-
     /**
      * This event is triggered when the ICE connects for the first time.
      */
@@ -87,26 +85,24 @@ const XMPPEvents = {
      */
     ICE_RESTART_SUCCESS: 'rtc.ice_restart_success',
 
-    /* Event fired when XMPP error is returned to any request, it is meant to be
-     * used to report 'signaling' errors to CallStats
-     *
-     * {
-     *   code: {XMPP error code}
-     *   reason: {XMPP error condition}
-     *   source = request.tree()
-     *   session = {JingleSession instance}
-     * }
+    /**
+     * Designates an event indicating that we were kicked from the XMPP MUC.
+     * @param {boolean} isSelfPresence - whether it is for local participant
+     * or another participant.
+     * @param {string} actorJid - the jid of the participant who was initator
+     * of the kick.
+     * @param {?string} participantJid - when it is not a kick for local participant,
+     * this is the jid of the participant which was kicked.
      */
-    JINGLE_ERROR: 'xmpp.jingle_error',
-
-    // Event fired when we have failed to set initial offer
-    JINGLE_FATAL_ERROR: 'xmpp.jingle_fatal_error',
-
-    // Designates an event indicating that we were kicked from the XMPP MUC.
     KICKED: 'xmpp.kicked',
 
     // Designates an event indicating that our role in the XMPP MUC has changed.
     LOCAL_ROLE_CHANGED: 'xmpp.localrole_changed',
+
+    /**
+     * Event fired when the unique meeting id is set.
+     */
+    MEETING_ID_SET: 'xmpp.meeting_id_set',
 
     // Designates an event indicating that an XMPP message in the MUC was
     // received.
@@ -181,6 +177,11 @@ const XMPPEvents = {
     // Designates an event indicating that we received statistics from a
     // participant in the MUC.
     REMOTE_STATS: 'xmpp.remote_stats',
+
+    /**
+     * Indicates that the offer / answer renegotiation has failed.
+     */
+    RENEGOTIATION_FAILED: 'xmpp.renegotiation_failed',
     RESERVATION_ERROR: 'xmpp.room_reservation_error',
     ROOM_CONNECT_ERROR: 'xmpp.room_connect_error',
     ROOM_CONNECT_NOT_ALLOWED_ERROR: 'xmpp.room_connect_error.not_allowed',
@@ -214,6 +215,11 @@ const XMPPEvents = {
      * Event fired when speaker stats update message is received.
      */
     SPEAKER_STATS_RECEIVED: 'xmpp.speaker_stats_received',
+
+    /**
+     * Event fired when conference creation timestamp is received.
+     */
+    CONFERENCE_TIMESTAMP_RECEIVED: 'xmpp.conference_timestamp_received',
 
     // Designates an event indicating that we should join the conference with
     // audio and/or video muted.

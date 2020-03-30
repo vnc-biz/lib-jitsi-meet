@@ -3,6 +3,12 @@
  */
 
 /**
+ * Event indicates that the current conference audio input switched between audio
+ * input states,i.e. with or without audio input.
+ */
+export const AUDIO_INPUT_STATE_CHANGE = 'conference.audio_input_state_changed';
+
+/**
  * Indicates that authentication status changed.
  */
 export const AUTH_STATUS_CHANGED = 'conference.auth_status_changed';
@@ -76,6 +82,11 @@ export const DISPLAY_NAME_CHANGED = 'conference.displayNameChanged';
 export const DOMINANT_SPEAKER_CHANGED = 'conference.dominantSpeaker';
 
 /**
+ * UTC conference timestamp when first participant joined.
+ */
+export const CONFERENCE_CREATED_TIMESTAMP = 'conference.createdTimestamp';
+
+/**
  * Indicates that DTMF support changed.
  */
 export const DTMF_SUPPORT_CHANGED = 'conference.dtmfSupportChanged';
@@ -104,8 +115,16 @@ export const JVB121_STATUS = 'conference.jvb121Status';
 
 /**
  * You are kicked from the conference.
+ * @param {JitsiParticipant} the participant that initiated the kick.
  */
 export const KICKED = 'conference.kicked';
+
+/**
+ * Participant was kicked from the conference.
+ * @param {JitsiParticipant} the participant that initiated the kick.
+ * @param {JitsiParticipant} the participant that was kicked.
+ */
+export const PARTICIPANT_KICKED = 'conference.participant_kicked';
 
 /**
  * The Last N set is changed.
@@ -133,6 +152,16 @@ export const SERVER_REGION_CHANGED = 'conference.server_region_changed';
  * New text message was received.
  */
 export const MESSAGE_RECEIVED = 'conference.messageReceived';
+
+/**
+ * Event indicates that the current selected input device has no signal
+ */
+export const NO_AUDIO_INPUT = 'conference.no_audio_input';
+
+/**
+ * Event indicates that the current microphone used by the conference is noisy.
+ */
+export const NOISY_MIC = 'conference.noisy_mic';
 
 /**
  * New private text message was received.
@@ -252,6 +281,8 @@ export const TRACK_AUDIO_LEVEL_CHANGED = 'conference.audioLevelsChanged';
 
 /**
  * A media track ( attached to the conference) mute status was changed.
+ * @param {JitsiParticipant|null} the participant that initiated the mute
+ * if it is a remote mute.
  */
 export const TRACK_MUTE_CHANGED = 'conference.trackMuteChanged';
 
