@@ -55,7 +55,6 @@ const OLD_GUM_DEFAULT_DEVICES = [ 'audio', 'video' ];
  */
 const DEFAULT_CONSTRAINTS = {
     video: {
-        aspectRatio: 16 / 9,
         height: {
             ideal: 720,
             max: 720,
@@ -162,6 +161,8 @@ function setResolutionConstraints(
  * @param {Object} options.frameRate - used only for dekstop sharing.
  * @param {Object} options.frameRate.min - Minimum fps
  * @param {Object} options.frameRate.max - Maximum fps
+ * @param {bool}   options.screenShareAudio - Used by electron clients to
+ * enable system audio screen sharing.
  */
 function getConstraints(um, options = {}) {
     const constraints = {
@@ -178,7 +179,7 @@ function getConstraints(um, options = {}) {
     // @see https://github.com/jitsi/lib-jitsi-meet/pull/136
     const isNewStyleConstraintsSupported
         = browser.isFirefox()
-            || browser.isSafariWithVP8()
+            || browser.isSafari()
             || browser.isReactNative();
 
     if (um.indexOf('video') >= 0) {
@@ -308,6 +309,21 @@ function getConstraints(um, options = {}) {
             }),
             optional: []
         };
+
+        // Audio screen sharing for electron only works for screen type devices.
+        // i.e. when the user shares the whole desktop.
+        if (browser.isElectron() && options.screenShareAudio
+            && (options.desktopStream.indexOf('screen') >= 0)) {
+
+            // Provide constraints as described by the electron desktop capturer
+            // documentation here:
+            // https://www.electronjs.org/docs/api/desktop-capturer
+            constraints.audio = { mandatory: {
+                chromeMediaSource: constraints.video.mandatory.chromeMediaSource
+            } };
+
+            delete constraints.video.mandatory.chromeMediaSourceId;
+        }
     }
 
     if (options.bandwidth) {
@@ -930,6 +946,8 @@ class RTCUtils extends Listenable {
     * @param {Object} options.frameRate - used only for dekstop sharing.
     * @param {Object} options.frameRate.min - Minimum fps
     * @param {Object} options.frameRate.max - Maximum fps
+    * @param {bool}   options.screenShareAudio - Used by electron clients to
+    * enable system audio screen sharing.
     * @returns {Promise} Returns a media stream on success or a JitsiTrackError
     * on failure.
     **/
@@ -940,17 +958,17 @@ class RTCUtils extends Listenable {
 
         return new Promise((resolve, reject) => {
             navigator.mediaDevices.getUserMedia(constraints)
-                .then(stream => {
-                    logger.log('onUserMediaSuccess');
-                    updateGrantedPermissions(um, stream);
-                    resolve(stream);
-                })
-                .catch(error => {
-                    logger.warn('Failed to get access to local media. '
-                        + ` ${error} ${constraints} `);
-                    updateGrantedPermissions(um, undefined);
-                    reject(new JitsiTrackError(error, constraints, um));
-                });
+            .then(stream => {
+                logger.log('onUserMediaSuccess');
+                updateGrantedPermissions(um, stream);
+                resolve(stream);
+            })
+            .catch(error => {
+                logger.warn('Failed to get access to local media. '
+                    + ` ${error} ${constraints} `);
+                updateGrantedPermissions(um, undefined);
+                reject(new JitsiTrackError(error, constraints, um));
+            });
         });
     }
 
@@ -1287,13 +1305,32 @@ class RTCUtils extends Listenable {
 
             const { stream, sourceId, sourceType } = desktopStream;
 
-            mediaStreamsMetaData.push({
-                stream,
-                sourceId,
-                sourceType,
-                track: stream.getVideoTracks()[0],
-                videoType: VideoType.DESKTOP
-            });
+            const desktopAudioTracks = stream.getAudioTracks();
+
+            if (desktopAudioTracks.length) {
+                const desktopAudioStream = new MediaStream(desktopAudioTracks);
+
+                mediaStreamsMetaData.push({
+                    stream: desktopAudioStream,
+                    sourceId,
+                    sourceType,
+                    track: desktopAudioStream.getAudioTracks()[0]
+                });
+            }
+
+            const desktopVideoTracks = stream.getVideoTracks();
+
+            if (desktopVideoTracks.length) {
+                const desktopVideoStream = new MediaStream(desktopVideoTracks);
+
+                mediaStreamsMetaData.push({
+                    stream: desktopVideoStream,
+                    sourceId,
+                    sourceType,
+                    track: desktopVideoStream.getVideoTracks()[0],
+                    videoType: VideoType.DESKTOP
+                });
+            }
         };
 
         /**
@@ -1398,7 +1435,7 @@ class RTCUtils extends Listenable {
     isDeviceChangeAvailable(deviceType) {
         return deviceType === 'output' || deviceType === 'audiooutput'
             ? isAudioOutputDeviceChangeAvailable
-            : !browser.isSafariWithVP8();
+            : !browser.isSafari();
     }
 
     /**

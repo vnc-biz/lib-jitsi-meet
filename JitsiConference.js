@@ -27,6 +27,7 @@ import IceFailedNotification
     from './modules/connectivity/IceFailedNotification';
 import ParticipantConnectionStatusHandler
     from './modules/connectivity/ParticipantConnectionStatus';
+import E2EEContext from './modules/e2ee/E2EEContext';
 import E2ePing from './modules/e2eping/e2eping';
 import Jvb121EventGenerator from './modules/event/Jvb121EventGenerator';
 import RecordingManager from './modules/recording/RecordingManager';
@@ -233,6 +234,10 @@ export default function JitsiConference(options) {
     this.videoSIPGWHandler = new VideoSIPGW(this.room);
     this.recordingManager = new RecordingManager(this.room);
     this._conferenceJoinAnalyticsEventSent = false;
+
+    if (browser.supportsInsertableStreams()) {
+        this._e2eeCtx = new E2EEContext({ salt: this.options.name });
+    }
 }
 
 // FIXME convert JitsiConference to ES6 - ASAP !
@@ -1027,32 +1032,6 @@ JitsiConference.prototype.replaceTrack = function(oldTrack, newTrack) {
 };
 
 /**
- * Replaces the track at the lower level by going through the Jingle session
- * and WebRTC peer connection. The track is replaced without the need for an
- * offer/answer cycle.
- * @param {JitsiLocalTrack} localTrack - the local track whose media stream has
- * been updated.
- */
-JitsiConference.prototype.replaceTrackWithoutOfferAnswer = function(localTrack) {
-    const replaceTrackPromises = [];
-
-    if (this.jvbJingleSession) {
-        replaceTrackPromises.push(
-            this.jvbJingleSession.replaceTrackWithoutOfferAnswer(localTrack));
-    } else {
-        logger.info('replaceTrackWithoutOfferAnswer - no JVB JingleSession');
-    }
-    if (this.p2pJingleSession) {
-        replaceTrackPromises.push(
-            this.p2pJingleSession.replaceTrackWithoutOfferAnswer(localTrack));
-    } else {
-        logger.info('_doReplaceTrack - no P2P JingleSession');
-    }
-
-    return Promise.all(replaceTrackPromises);
-};
-
-/**
  * Replaces the tracks at the lower level by going through the Jingle session
  * and WebRTC peer connection. The method will resolve immediately if there is
  * currently no JingleSession started.
@@ -1134,6 +1113,18 @@ JitsiConference.prototype._setupNewTrack = function(newTrack) {
     newTrack._setConference(this);
 
     this.eventEmitter.emit(JitsiConferenceEvents.TRACK_ADDED, newTrack);
+
+    // Setup E2EE handling, if supported.
+    if (this._e2eeCtx) {
+        const activeTPC = this.getActivePeerConnection();
+        const sender = activeTPC ? activeTPC.findSenderForTrack(newTrack.track) : null;
+
+        if (sender) {
+            this._e2eeCtx.handleSender(sender, newTrack.getType());
+        } else {
+            logger.warn(`Could not handle E2EE for local ${newTrack.getType()} track: sender not found`);
+        }
+    }
 };
 
 /**
@@ -1662,6 +1653,18 @@ JitsiConference.prototype.onRemoteTrackAdded = function(track) {
         return;
     }
 
+    // Setup E2EE handling, if supported.
+    if (this._e2eeCtx) {
+        const activeTPC = this.getActivePeerConnection();
+        const receiver = activeTPC ? activeTPC.findReceiverForTrack(track.track) : null;
+
+        if (receiver) {
+            this._e2eeCtx.handleReceiver(receiver, track.getType());
+        } else {
+            logger.warn(`Could not handle E2EE for remote ${track.getType()} track: receiver not found`);
+        }
+    }
+
     const id = track.getParticipantId();
     const participant = this.getParticipantById(id);
 
@@ -1736,6 +1739,8 @@ JitsiConference.prototype.onTransportInfo = function(session, transportInfo) {
  * @param {JitsiRemoteTrack} removedTrack
  */
 JitsiConference.prototype.onRemoteTrackRemoved = function(removedTrack) {
+    // TODO: handle E2EE.
+
     this.getParticipants().forEach(participant => {
         const tracks = participant.getTracks();
 
@@ -1863,6 +1868,7 @@ JitsiConference.prototype._acceptJvbIncomingCall = function(
             p2p: false,
             value: now
         }));
+
     try {
         jingleSession.initialize(this.room, this.rtc, this.options.config);
     } catch (error) {
@@ -3294,4 +3300,30 @@ JitsiConference.prototype._sendConferenceJoinAnalyticsEvent = function() {
         participantId: `${meetingId}.${this._statsCurrentId}`
     }));
     this._conferenceJoinAnalyticsEventSent = true;
+};
+
+/**
+ * Returns whether End-To-End encryption is supported. Note that not all participants
+ * in the conference may support it.
+ *
+ * @returns {boolean}
+ */
+JitsiConference.prototype.isE2EESupported = function() {
+    return Boolean(this._e2eeCtx);
+};
+
+/**
+ * Sets the key to be used for End-To-End encryption.
+ *
+ * @param {string} key the key to be used.
+ * @returns {void}
+ */
+JitsiConference.prototype.setE2EEKey = function(key) {
+    if (!this._e2eeCtx) {
+        logger.warn('Cannot set E2EE key: there is no defined context, platform is likely unsupported.');
+
+        return;
+    }
+
+    this._e2eeCtx.setKey(key);
 };

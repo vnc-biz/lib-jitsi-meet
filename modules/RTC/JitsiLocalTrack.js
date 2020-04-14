@@ -375,7 +375,9 @@ export default class JitsiLocalTrack extends JitsiTrack {
             return Promise.reject(new Error('setEffect already in progress!'));
         }
 
-        if (this.isMuted()) {
+        // In case we have an audio track that is being enhanced with an effect, we still want it to be applied,
+        // even if the track is muted. Where as for video the actual track doesn't exists if it's muted.
+        if (this.isMuted() && !this.isAudioTrack()) {
             this._streamEffect = effect;
 
             return Promise.resolve();
@@ -391,11 +393,13 @@ export default class JitsiLocalTrack extends JitsiTrack {
 
         this._setEffectInProgress = true;
 
-        // For firefox/safari, replace the stream without doing a offer answer with the remote peer.
-        if (browser.supportsRtpSender()) {
+        if (browser.usesUnifiedPlan()) {
             this._switchStreamEffect(effect);
+            if (this.isVideoTrack()) {
+                this.containers.forEach(cont => RTCUtils.attachMediaStream(cont, this.stream));
+            }
 
-            return conference.replaceTrackWithoutOfferAnswer(this)
+            return conference.replaceTrack(this, this)
                 .then(() => {
                     this._setEffectInProgress = false;
                 })
