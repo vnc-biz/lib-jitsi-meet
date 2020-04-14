@@ -606,6 +606,7 @@ export default class JingleSessionPC extends JingleSession {
 
         for (let mid = 0; mid < localSDP.media.length; mid++) {
             const cands = candidates.filter(el => el.sdpMLineIndex === mid);
+            logger.warn("JingleSessionPC sendIceCandidates: ", cands);
             const mline
                 = SDPUtil.parseMLine(localSDP.media[mid].split('\r\n')[0]);
 

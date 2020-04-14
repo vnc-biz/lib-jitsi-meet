@@ -45,6 +45,7 @@ const SDPUtil = {
         return line.substring(6);
     },
     parseMLine(line) {
+        logger.warn("SDPUtil parseMLine line: ", line);
         const data = {};
         const parts = line.substring(2).split(' ');
 
@@ -335,6 +336,7 @@ const SDPUtil = {
         // generation 0
         //      <candidate component=... foundation=... generation=... id=...
         // ip=... network=... port=... priority=... protocol=... type=.../>
+        logger.warn("candidateToJingle line: " + line);
         if (line.indexOf('candidate:') === 0) {
             // eslint-disable-next-line no-param-reassign
             line = `a=${line}`;
