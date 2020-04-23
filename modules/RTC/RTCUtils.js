@@ -807,7 +807,7 @@ class RTCUtils extends Listenable {
             this.getStreamID = ({ id }) => id;
             this.getTrackID = ({ id }) => id;
         } else if (browser.isChromiumBased() // this is chrome < 61
-                || browser.isReactNative()) {
+                || browser.isReactNative() || browser.isCordovaiOS()) {
 
             this.RTCPeerConnectionType = RTCPeerConnection;
 

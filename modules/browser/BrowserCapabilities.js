@@ -73,6 +73,12 @@ export default class BrowserCapabilities extends BrowserDetection {
             || (this.isSafari() && !this.isVersionLessThan('12.1'));
     }
 
+    isCordovaiOS() {
+        var isCord = !!(window.cordova && window.cordova.platformId && window.cordova.platformId.toLowerCase() === "ios");
+        // console.log("isCordovaiOS", isCord);
+        return isCord
+    }
+
     /**
      * Returns whether or not the current environment needs a user interaction
      * with the page before any unmute can occur.
@@ -191,6 +197,10 @@ export default class BrowserCapabilities extends BrowserDetection {
      * @returns {boolean}
      */
     usesUnifiedPlan() {
+        if (this.isCordovaiOS()) {
+            return false;
+        }
+
         if (this.isFirefox()) {
             return true;
         }
@@ -215,6 +225,10 @@ export default class BrowserCapabilities extends BrowserDetection {
      * @returns {boolean}
      */
     usesNewGumFlow() {
+        if (this.isCordovaiOS()) {
+            return false;
+        }
+
         const REQUIRED_CHROME_VERSION = 61;
 
         if (this.isChrome()) {
@@ -277,7 +291,7 @@ export default class BrowserCapabilities extends BrowserDetection {
      * @returns {boolean}
      */
     supportsSdpSemantics() {
-        return this.isChromiumBased() && this._getChromiumBasedVersion() >= 65;
+        return this.isCordovaiOS() || this.isChromiumBased() && this._getChromiumBasedVersion() >= 65;
     }
 
     /**
