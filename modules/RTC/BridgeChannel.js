@@ -280,7 +280,7 @@ export default class BridgeChannel {
             // WS error events contain no information about the failure (this is available in the onclose event) and
             // the event references the WS object itself, which causes hangs on mobile.
             if (this._mode !== 'websocket') {
-                logger.error(`Channel error: ${event.message}`);
+                logger.error(`Channel error: ${event.message}`, event);
             }
         };
 

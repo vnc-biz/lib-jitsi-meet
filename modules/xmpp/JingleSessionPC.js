@@ -1621,6 +1621,8 @@ export default class JingleSessionPC extends JingleSession {
         });
         remoteSdp.raw = remoteSdp.session + remoteSdp.media.join('');
 
+        // remoteSdp.raw = remoteSdp.raw.replace('a=rtpmap:100 VP8/90000', 'a=rtpmap:100 VP8/90000\r\na=fmtp:100 x-google-max-bitrate=256');
+
         return remoteSdp;
     }
 
@@ -1638,6 +1640,8 @@ export default class JingleSessionPC extends JingleSession {
             remoteSdp.media[idx] += lines;
         });
         remoteSdp.raw = remoteSdp.session + remoteSdp.media.join('');
+
+        // remoteSdp.raw = remoteSdp.raw.replace('a=rtpmap:100 VP8/90000', 'a=rtpmap:100 VP8/90000\r\na=fmtp:100 x-google-max-bitrate=256');
 
         return remoteSdp;
     }
