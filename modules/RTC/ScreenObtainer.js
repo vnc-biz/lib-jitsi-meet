@@ -339,9 +339,10 @@ const ScreenObtainer = {
                         sourceId: stream.id
                     }));
             })
-            .catch(() =>
+            .catch(error => {
                 errorCallback(new JitsiTrackError(JitsiTrackErrors
-                    .CHROME_EXTENSION_USER_CANCELED)));
+                    .CHROME_EXTENSION_USER_CANCELED, error.message))
+                });
     }
 };
 
