@@ -39,6 +39,12 @@ export default class IceFailedHandling {
         const useTerminateForRestart = supportsRestartByTerminate && !enableIceRestart;
         const reloadClient = this._conference.restartInProgress && enableForcedReload;
 
+        console.log('ICE failed,'
+            + ` enableForcedReload: ${enableForcedReload},`
+            + ` enableIceRestart: ${enableIceRestart},`
+            + ` restartInProgress: ${this._conference.restartInProgress},`
+            + ` supports restart by terminate: ${supportsRestartByTerminate}`);
+
         logger.info('ICE failed,'
             + ` enableForcedReload: ${enableForcedReload},`
             + ` enableIceRestart: ${enableIceRestart},`
@@ -47,6 +53,7 @@ export default class IceFailedHandling {
 
         if (explicitlyDisabled || (!enableIceRestart && !supportsRestartByTerminate) || reloadClient) {
             logger.info('ICE failed, but ICE restarts are disabled');
+            console.log('ICE failed, but ICE restarts are disabled');
             this._conference.eventEmitter.emit(
                 JitsiConferenceEvents.CONFERENCE_FAILED,
                 JitsiConferenceErrors.ICE_FAILED);
@@ -59,19 +66,26 @@ export default class IceFailedHandling {
 
         if (!jvbConnection) {
             logger.warn('Not sending ICE failed - no JVB connection');
+            console.warn('Not sending ICE failed - no JVB connection');
         } else if (jvbConnIceState === 'connected') {
             logger.info('ICE connection restored - not sending ICE failed');
+            console.log('ICE connection restored - not sending ICE failed');
         } else {
             logger.info('Sending ICE failed - the connection did not recover, '
+                + `ICE state: ${jvbConnIceState}, `
+                + `use 'session-terminate': ${useTerminateForRestart}`);
+            console.log('Sending ICE failed - the connection did not recover, '
                 + `ICE state: ${jvbConnIceState}, `
                 + `use 'session-terminate': ${useTerminateForRestart}`);
             if (useTerminateForRestart) {
                 this._conference.jvbJingleSession.terminate(
                     () => {
                         logger.info('session-terminate for ice restart - done');
+                        console.log('session-terminate for ice restart - done');
                     },
                     error => {
                         logger.error(`session-terminate for ice restart - error: ${error.message}`);
+                        console.error(`session-terminate for ice restart - error: ${error.message}`);
                     }, {
                         reason: 'connectivity-error',
                         reasonDescription: 'ICE FAILED',
@@ -88,6 +102,8 @@ export default class IceFailedHandling {
      * Starts the task.
      */
     start() {
+        console.log('[IceFailedHandling][start]');
+
         //  Using xmpp.ping allows to handle both XMPP being disconnected and internet offline cases. The ping function
         // uses sendIQ2 method which is resilient to XMPP connection disconnected state and will patiently wait until it
         // gets reconnected.
@@ -99,6 +115,7 @@ export default class IceFailedHandling {
         // to 'item-not-found' error returned by the server.
         this._conference.xmpp.ping(65000).then(
             () => {
+                console.log('[IceFailedHandling] _conference.xmpp.ping', this._canceled);
                 if (!this._canceled) {
                     this._iceFailedTimeout = window.setTimeout(() => {
                         this._iceFailedTimeout = undefined;
@@ -107,6 +124,7 @@ export default class IceFailedHandling {
                 }
             },
             error => {
+                console.error('[IceFailedHandling] _conference.xmpp.ping', error);
                 logger.error('PING error/timeout - not sending ICE failed', error);
             });
     }
@@ -115,6 +133,8 @@ export default class IceFailedHandling {
      * Cancels the task.
      */
     cancel() {
+        console.log('[IceFailedHandling][cancel]');
+
         this._canceled = true;
         window.clearTimeout(this._iceFailedTimeout);
     }

@@ -572,6 +572,8 @@ JitsiConference.prototype.isP2PTestModeEnabled = function() {
  * @returns {Promise}
  */
 JitsiConference.prototype.leave = function() {
+    console.log('[JitsiConference][leave]');
+
     if (this.participantConnectionStatus) {
         this.participantConnectionStatus.dispose();
         this.participantConnectionStatus = null;
@@ -616,6 +618,8 @@ JitsiConference.prototype.leave = function() {
     // leave the conference
     if (this.room) {
         const room = this.room;
+
+        console.log("[JitsiConference][leave] supportsRestartByTerminate: ", this.room.supportsRestartByTerminate());
 
         // Unregister connection state listeners
         room.removeListener(
@@ -2686,6 +2690,8 @@ JitsiConference.prototype.isConnectionInterrupted = function() {
  * @private
  */
 JitsiConference.prototype._onConferenceRestarted = function(session) {
+    console.log("[JitsiConference][_onConferenceRestarted]", `p2p: ${session.isP2P}`);
+
     if (!session.isP2P && this.options.config.enableForcedReload) {
         this.restartInProgress = true;
         this.eventEmitter.emit(JitsiConferenceEvents.CONFERENCE_FAILED, JitsiConferenceErrors.CONFERENCE_RESTARTED);
@@ -2714,6 +2720,8 @@ JitsiConference.prototype._onIceConnectionInterrupted = function(session) {
  * @private
  */
 JitsiConference.prototype._onIceConnectionFailed = function(session) {
+    console.warn('[JitsiConference][_onIceConnectionFailed]', `isP2P: ${session.isP2P}`, !!session, this.jvbJingleSession === session);
+
     // We do nothing for the JVB connection, because it's up to the Jicofo to
     // eventually come up with the new offer (at least for the time being).
     if (session.isP2P) {
@@ -2743,6 +2751,8 @@ JitsiConference.prototype._onIceConnectionFailed = function(session) {
  * @private
  */
 JitsiConference.prototype._onIceConnectionRestored = function(session) {
+    console.warn('[JitsiConference][_onIceConnectionRestored]', `isP2P: ${session.isP2P}`);
+
     if (session.isP2P) {
         this.isP2PConnectionInterrupted = false;
     } else {

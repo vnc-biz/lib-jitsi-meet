@@ -450,7 +450,7 @@ export default class JingleSessionPC extends JingleSession {
                     = now;
             }
             logger.log(
-                `(TIME) ICE ${this.peerconnection.iceConnectionState}`
+                `(TIME) ICE: ${this.peerconnection.iceConnectionState}`
                     + ` P2P? ${this.isP2P}:\t`,
                 now);
 
@@ -475,6 +475,11 @@ export default class JingleSessionPC extends JingleSession {
             case 'connected':
                 // Informs interested parties that the connection has been restored. This includes the case when
                 // media connection to the bridge has been restored after an ICE failure by using session-terminate.
+                console.log("[JingleSessionPC][oniceconnectionstatechange] connected",
+                    this.peerconnection.signalingState,
+                    this.options.enableIceRestart,
+                    this.room.supportsRestartByTerminate());
+
                 if (this.peerconnection.signalingState === 'stable') {
                     const usesTerminateForRestart = !this.options.enableIceRestart
                         && this.room.supportsRestartByTerminate();
