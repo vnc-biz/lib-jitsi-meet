@@ -1,7 +1,7 @@
 /* global __filename, Promise */
 
 import { getLogger } from 'jitsi-meet-logger';
-import JitsiTrack from './JitsiTrack';
+
 import JitsiTrackError from '../../JitsiTrackError';
 import {
     TRACK_IS_DISPOSED,
@@ -12,8 +12,6 @@ import {
     NO_DATA_FROM_SOURCE,
     TRACK_MUTE_CHANGED
 } from '../../JitsiTrackEvents';
-import browser from '../browser';
-import RTCUtils from './RTCUtils';
 import CameraFacingMode from '../../service/RTC/CameraFacingMode';
 import * as MediaType from '../../service/RTC/MediaType';
 import RTCEvents from '../../service/RTC/RTCEvents';
@@ -23,7 +21,11 @@ import {
     TRACK_UNMUTED,
     createNoDataFromSourceEvent
 } from '../../service/statistics/AnalyticsEvents';
+import browser from '../browser';
 import Statistics from '../statistics/statistics';
+
+import JitsiTrack from './JitsiTrack';
+import RTCUtils from './RTCUtils';
 
 const logger = getLogger(__filename);
 
@@ -92,6 +94,7 @@ export default class JitsiLocalTrack extends JitsiTrack {
             // Get the resolution from the track itself because it cannot be
             // certain which resolution webrtc has fallen back to using.
             this.resolution = track.getSettings().height;
+            this.maxEnabledResolution = resolution;
 
             // Cache the constraints of the track in case of any this track
             // model needs to call getUserMedia again, such as when unmuting.
@@ -109,6 +112,7 @@ export default class JitsiLocalTrack extends JitsiTrack {
             // resolutions so we do not store it, to avoid wrong reporting of
             // local track resolution.
             this.resolution = browser.isFirefox() ? null : resolution;
+            this.maxEnabledResolution = this.resolution;
         }
 
         this.deviceId = deviceId;
@@ -334,6 +338,7 @@ export default class JitsiLocalTrack extends JitsiTrack {
         this._streamEffect = effect;
         this._originalStream = this.stream;
         this._setStream(this._streamEffect.startEffect(this._originalStream));
+        this.track = this.stream.getTracks()[0];
     }
 
     /**
@@ -346,6 +351,8 @@ export default class JitsiLocalTrack extends JitsiTrack {
         if (this._streamEffect) {
             this._streamEffect.stopEffect();
             this._setStream(this._originalStream);
+            this._originalStream = null;
+            this.track = this.stream.getTracks()[0];
         }
     }
 
@@ -503,7 +510,13 @@ export default class JitsiLocalTrack extends JitsiTrack {
                 || this.videoType === VideoType.DESKTOP
                 || !browser.doesVideoMuteByStreamRemove()) {
             logMuteInfo();
-            if (this.track) {
+
+            // If we have a stream effect that implements its own mute functionality, prioritize it before
+            // normal mute e.g. the stream effect that implements system audio sharing has a custom
+            // mute state in which if the user mutes, system audio still has to go through.
+            if (this._streamEffect && this._streamEffect.setMuted) {
+                this._streamEffect.setMuted(muted);
+            } else if (this.track) {
                 this.track.enabled = !muted;
             }
         } else if (muted) {
@@ -551,7 +564,7 @@ export default class JitsiLocalTrack extends JitsiTrack {
                     = RTCUtils.obtainAudioAndVideoPermissions(streamOptions);
             }
 
-            promise.then(streamsInfo => {
+            promise = promise.then(streamsInfo => {
                 // The track kind for presenter track is video as well.
                 const mediaType = this.getType() === MediaType.PRESENTER ? MediaType.VIDEO : this.getType();
                 const streamInfo
@@ -705,6 +718,11 @@ export default class JitsiLocalTrack extends JitsiTrack {
         }
         if (this.isVideoTrack() && !this.isActive()) {
             return true;
+        }
+
+        // If currently used stream effect has its own muted state, use that.
+        if (this._streamEffect && this._streamEffect.isMuted) {
+            return this._streamEffect.isMuted();
         }
 
         return !this.track || !this.track.enabled;

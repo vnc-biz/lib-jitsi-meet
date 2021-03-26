@@ -7,6 +7,10 @@ const XMPPEvents = {
     // Designates an event indicating that the focus has asked us to mute our
     // audio.
     AUDIO_MUTED_BY_FOCUS: 'xmpp.audio_muted_by_focus',
+
+    // Designates an event indicating that the focus has asked us to disable our
+    // camera.
+    VIDEO_MUTED_BY_FOCUS: 'xmpp.video_muted_by_focus',
     AUTHENTICATION_REQUIRED: 'xmpp.authentication_required',
     BRIDGE_DOWN: 'xmpp.bridge_down',
 
@@ -49,6 +53,10 @@ const XMPPEvents = {
     // Designates an event indicating that the media (ICE) connection failed.
     // This should go to the RTC module.
     CONNECTION_ICE_FAILED: 'xmpp.connection.ice.failed',
+
+    // Designates an event indicating that the call has been migrated to a different
+    // bridge and that the client needs to be restarted for a successful transition.
+    CONNECTION_RESTARTED: 'xmpp.connection.restart',
 
     /**
      * Designates an event indicating connection status changes.
@@ -108,6 +116,10 @@ const XMPPEvents = {
     // received.
     MESSAGE_RECEIVED: 'xmpp.message_received',
 
+    // Designates an event indicating that an invite XMPP message in the MUC was
+    // received.
+    INVITE_MESSAGE_RECEIVED: 'xmpp.invite_message_received',
+
     // Designates an event indicating that a private XMPP message in the MUC was
     // received.
     PRIVATE_MESSAGE_RECEIVED: 'xmpp.private_message_received',
@@ -127,6 +139,18 @@ const XMPPEvents = {
     // Designates an event indicating that a participant left the XMPP MUC.
     MUC_MEMBER_LEFT: 'xmpp.muc_member_left',
 
+    // Designates an event indicating that a participant joined the lobby XMPP MUC.
+    MUC_LOBBY_MEMBER_JOINED: 'xmpp.muc_lobby_member_joined',
+
+    // Designates an event indicating that a participant in the lobby XMPP MUC has been updated
+    MUC_LOBBY_MEMBER_UPDATED: 'xmpp.muc_lobby_member_updated',
+
+    // Designates an event indicating that a participant left the XMPP MUC.
+    MUC_LOBBY_MEMBER_LEFT: 'xmpp.muc_lobby_member_left',
+
+    // Designates an event indicating that a participant was denied access to a conference from the lobby XMPP MUC.
+    MUC_DENIED_ACCESS: 'xmpp.muc_denied access',
+
     // Designates an event indicating that local participant left the muc
     MUC_LEFT: 'xmpp.muc_left',
 
@@ -136,6 +160,9 @@ const XMPPEvents = {
 
     // Designates an event indicating that the MUC has been locked or unlocked.
     MUC_LOCK_CHANGED: 'xmpp.muc_lock_changed',
+
+    // Designates an event indicating that the MUC members only config has changed.
+    MUC_MEMBERS_ONLY_CHANGED: 'xmpp.muc_members_only_changed',
 
     // Designates an event indicating that a participant in the XMPP MUC has
     // advertised that they have audio muted (or unmuted).
@@ -154,9 +181,8 @@ const XMPPEvents = {
     /**
      * Indicates that the features of the participant has been changed.
      */
-    PARTCIPANT_FEATURES_CHANGED: 'xmpp.partcipant_features_changed',
+    PARTICIPANT_FEATURES_CHANGED: 'xmpp.participant_features_changed',
     PASSWORD_REQUIRED: 'xmpp.password_required',
-    PEERCONNECTION_READY: 'xmpp.peerconnection_ready',
 
     /**
      * Indicates that phone number changed.
@@ -186,6 +212,7 @@ const XMPPEvents = {
     ROOM_CONNECT_ERROR: 'xmpp.room_connect_error',
     ROOM_CONNECT_NOT_ALLOWED_ERROR: 'xmpp.room_connect_error.not_allowed',
     ROOM_JOIN_ERROR: 'xmpp.room_join_error',
+    ROOM_CONNECT_MEMBERS_ONLY_ERROR: 'xmpp.room_connect_error.members_only',
 
     /**
      * Indicates that max users limit has been reached.

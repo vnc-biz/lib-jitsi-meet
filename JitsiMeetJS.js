@@ -1,15 +1,7 @@
 /* global __filename */
 
-import getActiveAudioDevice from './modules/detection/ActiveDeviceDetector';
-import AudioMixer from './modules/webaudio/AudioMixer';
-import * as DetectionEvents from './modules/detection/DetectionEvents';
-import TrackVADEmitter from './modules/detection/TrackVADEmitter';
-import { createGetUserMediaEvent } from './service/statistics/AnalyticsEvents';
-import AuthUtil from './modules/util/AuthUtil';
-import * as ConnectionQualityEvents
-    from './service/connectivity/ConnectionQualityEvents';
-import * as E2ePingEvents from './service/e2eping/E2ePingEvents';
-import GlobalOnErrorHandler from './modules/util/GlobalOnErrorHandler';
+import Logger from 'jitsi-meet-logger';
+
 import * as JitsiConferenceErrors from './JitsiConferenceErrors';
 import * as JitsiConferenceEvents from './JitsiConferenceEvents';
 import JitsiConnection from './JitsiConnection';
@@ -21,20 +13,32 @@ import JitsiTrackError from './JitsiTrackError';
 import * as JitsiTrackErrors from './JitsiTrackErrors';
 import * as JitsiTrackEvents from './JitsiTrackEvents';
 import * as JitsiTranscriptionStatus from './JitsiTranscriptionStatus';
-import LocalStatsCollector from './modules/statistics/LocalStatsCollector';
-import Logger from 'jitsi-meet-logger';
-import * as MediaType from './service/RTC/MediaType';
-import Resolutions from './service/RTC/Resolutions';
-import { ParticipantConnectionStatus }
-    from './modules/connectivity/ParticipantConnectionStatus';
 import RTC from './modules/RTC/RTC';
 import browser from './modules/browser';
-import ScriptUtil from './modules/util/ScriptUtil';
-import recordingConstants from './modules/recording/recordingConstants';
+import NetworkInfo from './modules/connectivity/NetworkInfo';
+import { ParticipantConnectionStatus }
+    from './modules/connectivity/ParticipantConnectionStatus';
+import getActiveAudioDevice from './modules/detection/ActiveDeviceDetector';
+import * as DetectionEvents from './modules/detection/DetectionEvents';
+import TrackVADEmitter from './modules/detection/TrackVADEmitter';
 import ProxyConnectionService
     from './modules/proxyconnection/ProxyConnectionService';
+import recordingConstants from './modules/recording/recordingConstants';
+import Settings from './modules/settings/Settings';
+import LocalStatsCollector from './modules/statistics/LocalStatsCollector';
+import precallTest from './modules/statistics/PrecallTest';
 import Statistics from './modules/statistics/statistics';
+import AuthUtil from './modules/util/AuthUtil';
+import GlobalOnErrorHandler from './modules/util/GlobalOnErrorHandler';
+import ScriptUtil from './modules/util/ScriptUtil';
 import * as VideoSIPGWConstants from './modules/videosipgw/VideoSIPGWConstants';
+import AudioMixer from './modules/webaudio/AudioMixer';
+import * as MediaType from './service/RTC/MediaType';
+import Resolutions from './service/RTC/Resolutions';
+import * as ConnectionQualityEvents
+    from './service/connectivity/ConnectionQualityEvents';
+import * as E2ePingEvents from './service/e2eping/E2ePingEvents';
+import { createGetUserMediaEvent } from './service/statistics/AnalyticsEvents';
 
 const logger = Logger.getLogger(__filename);
 
@@ -42,7 +46,7 @@ const logger = Logger.getLogger(__filename);
  * The amount of time to wait until firing
  * {@link JitsiMediaDevicesEvents.PERMISSION_PROMPT_IS_SHOWN} event.
  */
-const USER_MEDIA_PERMISSION_PROMPT_TIMEOUT = 1000;
+const USER_MEDIA_SLOW_PROMISE_TIMEOUT = 1000;
 
 /**
  * Gets the next lowest desirable resolution to try for a camera. If the given
@@ -172,6 +176,7 @@ export default _mergeNamespaceAndModule({
     mediaDevices: JitsiMediaDevices,
     analytics: Statistics.analytics,
     init(options = {}) {
+        Settings.init(options.externalStorage);
         Statistics.init(options);
 
         // Initialize global window.connectionTimes
@@ -295,14 +300,14 @@ export default _mergeNamespaceAndModule({
      * which should be created. should be created or some additional
      * configurations about resolution for example.
      * @param {Array} options.effects optional effects array for the track
+     * @param {boolean} options.firePermissionPromptIsShownEvent - if event
+     * JitsiMediaDevicesEvents.PERMISSION_PROMPT_IS_SHOWN should be fired
+     * @param {boolean} options.fireSlowPromiseEvent - if event
+     * JitsiMediaDevicesEvents.USER_MEDIA_SLOW_PROMISE_TIMEOUT should be fired
      * @param {Array} options.devices the devices that will be requested
      * @param {string} options.resolution resolution constraints
      * @param {string} options.cameraDeviceId
      * @param {string} options.micDeviceId
-     * @param {object} options.desktopSharingExtensionExternalInstallation -
-     * enables external installation process for desktop sharing extension if
-     * the inline installation is not posible. The following properties should
-     * be provided:
      * @param {intiger} interval - the interval (in ms) for
      * checking whether the desktop sharing extension is installed or not
      * @param {Function} checkAgain - returns boolean. While checkAgain()==true
@@ -321,26 +326,29 @@ export default _mergeNamespaceAndModule({
      * will finish the execution. If checkAgain returns false, createLocalTracks
      * will finish the execution with rejected Promise.
      *
-     * @param {boolean} (firePermissionPromptIsShownEvent) - if event
-     * JitsiMediaDevicesEvents.PERMISSION_PROMPT_IS_SHOWN should be fired
+     * @deprecated old firePermissionPromptIsShownEvent
      * @param originalOptions - internal use only, to be able to store the
      * originally requested options.
      * @returns {Promise.<{Array.<JitsiTrack>}, JitsiConferenceError>} A promise
      * that returns an array of created JitsiTracks if resolved, or a
      * JitsiConferenceError if rejected.
      */
-    createLocalTracks(
-            options = {}, firePermissionPromptIsShownEvent, originalOptions) {
+    createLocalTracks(options = {}, oldfirePermissionPromptIsShownEvent, originalOptions) {
         let promiseFulfilled = false;
 
-        if (firePermissionPromptIsShownEvent === true) {
+        const { firePermissionPromptIsShownEvent, fireSlowPromiseEvent, ...restOptions } = options;
+        const firePermissionPrompt = firePermissionPromptIsShownEvent || oldfirePermissionPromptIsShownEvent;
+
+        if (firePermissionPrompt && !RTC.arePermissionsGrantedForAvailableDevices()) {
+            JitsiMediaDevices.emitEvent(
+                JitsiMediaDevicesEvents.PERMISSION_PROMPT_IS_SHOWN,
+                browser.getName());
+        } else if (fireSlowPromiseEvent) {
             window.setTimeout(() => {
                 if (!promiseFulfilled) {
-                    JitsiMediaDevices.emitEvent(
-                        JitsiMediaDevicesEvents.PERMISSION_PROMPT_IS_SHOWN,
-                        browser.getName());
+                    JitsiMediaDevices.emitEvent(JitsiMediaDevicesEvents.SLOW_GET_USER_MEDIA);
                 }
-            }, USER_MEDIA_PERMISSION_PROMPT_TIMEOUT);
+            }, USER_MEDIA_SLOW_PROMISE_TIMEOUT);
         }
 
         if (!window.connectionTimes) {
@@ -349,7 +357,7 @@ export default _mergeNamespaceAndModule({
         window.connectionTimes['obtainPermissions.start']
             = window.performance.now();
 
-        return RTC.obtainAudioAndVideoPermissions(options)
+        return RTC.obtainAudioAndVideoPermissions(restOptions)
             .then(tracks => {
                 promiseFulfilled = true;
 
@@ -359,7 +367,7 @@ export default _mergeNamespaceAndModule({
                 Statistics.sendAnalytics(
                     createGetUserMediaEvent(
                         'success',
-                        getAnalyticsAttributesFromOptions(options)));
+                        getAnalyticsAttributesFromOptions(restOptions)));
 
                 if (!RTC.options.disableAudioLevels) {
                     for (let i = 0; i < tracks.length; i++) {
@@ -407,11 +415,11 @@ export default _mergeNamespaceAndModule({
 
                 if (error.name === JitsiTrackErrors.UNSUPPORTED_RESOLUTION
                     && !browser.usesNewGumFlow()) {
-                    const oldResolution = options.resolution || '720';
+                    const oldResolution = restOptions.resolution || '720';
                     const newResolution = getLowerResolution(oldResolution);
 
                     if (newResolution !== null) {
-                        options.resolution = newResolution;
+                        restOptions.resolution = newResolution;
 
                         logger.debug(
                             'Retry createLocalTracks with resolution',
@@ -426,9 +434,8 @@ export default _mergeNamespaceAndModule({
                             }));
 
                         return this.createLocalTracks(
-                            options,
-                            undefined,
-                            originalOptions || Object.assign({}, options));
+                            restOptions,
+                            originalOptions || Object.assign({}, restOptions));
                     }
 
                     // We tried everything. If there is a mandatory device id,
@@ -445,12 +452,12 @@ export default _mergeNamespaceAndModule({
                 }
 
                 if (error.name
-                        === JitsiTrackErrors.CHROME_EXTENSION_USER_CANCELED) {
+                        === JitsiTrackErrors.SCREENSHARING_USER_CANCELED) {
                     // User cancelled action is not really an error, so only
                     // log it as an event to avoid having conference classified
                     // as partially failed
                     const logObject = {
-                        id: 'chrome_extension_user_canceled',
+                        id: 'screensharing_user_canceled',
                         message: error.message
                     };
 
@@ -619,6 +626,16 @@ export default _mergeNamespaceAndModule({
     },
 
     /**
+     * Informs lib-jitsi-meet about the current network status.
+     *
+     * @param {boolean} isOnline - {@code true} if the internet connectivity is online or {@code false}
+     * otherwise.
+     */
+    setNetworkInfo({ isOnline }) {
+        NetworkInfo.updateNetworkInfo({ isOnline });
+    },
+
+    /**
      * Set the contentHint on the transmitted stream track to indicate
      * charaterstics in the video stream, which informs PeerConnection
      * on how to encode the track (to prefer motion or individual frame detail)
@@ -635,6 +652,8 @@ export default _mergeNamespaceAndModule({
             logger.debug('MediaStreamTrack contentHint attribute not supported');
         }
     },
+
+    precallTest,
 
     /* eslint-enable max-params */
 

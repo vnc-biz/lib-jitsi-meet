@@ -14,13 +14,13 @@ const RTCEvents = {
     LASTN_ENDPOINT_CHANGED: 'rtc.lastn_endpoint_changed',
 
     /**
-     * Event emitted when the user granted a permission for the camera / mic.
+     * Event emitted when the user granted/blocked a permission for the camera / mic.
      * Used to keep track of the granted permissions on browsers which don't
      * support the Permissions API.
      */
-    GRANTED_PERMISSIONS: 'rtc.granted_permissions',
+    PERMISSIONS_CHANGED: 'rtc.permissions_changed',
 
-    IS_SELECTED_CHANGED: 'rtc.is_selected_change',
+    SENDER_VIDEO_CONSTRAINTS_CHANGED: 'rtc.sender_video_constraints_changed',
 
     /**
      * Event emitted when {@link RTC.setLastN} method is called to update with
@@ -36,6 +36,11 @@ const RTCEvents = {
      * @param {string} ssrc that was stored
      */
     LOCAL_TRACK_SSRC_UPDATED: 'rtc.local_track_ssrc_updated',
+
+    /**
+     * The max enabled resolution of a local video track was changed.
+     */
+    LOCAL_TRACK_MAX_ENABLED_RESOLUTION_CHANGED: 'rtc.local_track_max_enabled_resolution_changed',
 
     TRACK_ATTACHED: 'rtc.track_attached',
 
