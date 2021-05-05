@@ -170,10 +170,11 @@ export class ReceiveVideoController {
         this._conference = conference;
         this._rtc = rtc;
 
+        // Enable new receiver constraints by default unless it is explicitly disabled through config.js.
+        const useNewReceiverConstraints = conference.options?.config?.useNewBandwidthAllocationStrategy ?? true;
+
         // Translate the legacy bridge channel signaling format to the new format.
-        this._receiverVideoConstraints = conference.options?.config?.useNewBandwidthAllocationStrategy
-            ? new ReceiverVideoConstraints()
-            : undefined;
+        this._receiverVideoConstraints = useNewReceiverConstraints ? new ReceiverVideoConstraints() : undefined;
 
         // The number of videos requested from the bridge, -1 represents unlimited or all available videos.
         this._lastN = LASTN_UNLIMITED;
@@ -198,7 +199,12 @@ export class ReceiveVideoController {
      * @private
      */
     _onMediaSessionStarted(mediaSession) {
-        this._maxFrameHeight && mediaSession.setReceiverVideoConstraint(this._maxFrameHeight);
+        if (mediaSession.isP2P || !this._receiverVideoConstraints) {
+            mediaSession.setReceiverVideoConstraint(this._maxFrameHeight);
+        } else {
+            this._receiverVideoConstraints.updateReceiveResolution(this._maxFrameHeight);
+            this._rtc.setNewReceiverVideoConstraints(this._receiverVideoConstraints.constraints);
+        }
     }
 
     /**
@@ -221,11 +227,17 @@ export class ReceiveVideoController {
         this._selectedEndpoints = ids;
 
         if (this._receiverVideoConstraints) {
-            const remoteEndpointIds = ids.filter(id => id !== this._conference.myUserId());
-
             // Filter out the local endpointId from the list of selected endpoints.
+            const remoteEndpointIds = ids.filter(id => id !== this._conference.myUserId());
+            const oldConstraints = JSON.parse(JSON.stringify(this._receiverVideoConstraints.constraints));
+
             remoteEndpointIds.length && this._receiverVideoConstraints.updateSelectedEndpoints(remoteEndpointIds);
-            this._rtc.setNewReceiverVideoConstraints(this._receiverVideoConstraints.constraints);
+            const newConstraints = this._receiverVideoConstraints.constraints;
+
+            // Send bridge message only when the constraints change.
+            if (!isEqual(newConstraints, oldConstraints)) {
+                this._rtc.setNewReceiverVideoConstraints(newConstraints);
+            }
 
             return;
         }
@@ -288,6 +300,10 @@ export class ReceiveVideoController {
 
         const constraintsChanged = this._receiverVideoConstraints.updateReceiverVideoConstraints(constraints);
 
-        constraintsChanged && this._rtc.setNewReceiverVideoConstraints(constraints);
+        if (constraintsChanged) {
+            this._lastN = constraints.lastN ?? this._lastN;
+            this._selectedEndpoints = constraints.selectedEndpoints ?? this._selectedEndpoints;
+            this._rtc.setNewReceiverVideoConstraints(constraints);
+        }
     }
 }

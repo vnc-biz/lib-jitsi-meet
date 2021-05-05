@@ -1124,10 +1124,14 @@ JitsiConference.prototype.replaceTrack = function(oldTrack, newTrack) {
             if (oldTrack) {
                 this.onLocalTrackRemoved(oldTrack);
             }
+
+            // Send 'VideoTypeMessage' on the bridge channel for the new track.
             if (newTrack) {
-                // Now handle the addition of the newTrack at the
-                // JitsiConference level
+                // Now handle the addition of the newTrack at the JitsiConference level
                 this._setupNewTrack(newTrack);
+                newTrack.isVideoTrack() && this.rtc.setVideoType(newTrack.videoType);
+            } else {
+                oldTrack && oldTrack.isVideoTrack() && this.rtc.setVideoType(VideoType.NONE);
             }
 
             return Promise.resolve();
@@ -1188,12 +1192,12 @@ JitsiConference.prototype._setupNewTrack = function(newTrack) {
         }
     }
     if (newTrack.isVideoTrack()) {
-        this.sendCommand('videoType', {
-            value: newTrack.videoType,
-            attributes: {
-                xmlns: 'http://jitsi.org/jitmeet/video'
-            }
-        });
+        const videoTypeTagName = 'videoType';
+
+        // if video type is camera and there is no videoType in presence, we skip adding it, as this is the default one
+        if (newTrack.videoType !== VideoType.CAMERA || this.room.getFromPresence(videoTypeTagName)) {
+            this.sendCommand(videoTypeTagName, { value: newTrack.videoType });
+        }
     }
     this.rtc.addLocalTrack(newTrack);
 
@@ -1233,20 +1237,20 @@ JitsiConference.prototype._addLocalTrackAsUnmute = function(track) {
     if (this.jvbJingleSession) {
         addAsUnmutePromises.push(this.jvbJingleSession.addTrackAsUnmute(track));
     } else {
-        logger.info(
-            'Add local MediaStream as unmute -'
-                + ' no JVB Jingle session started yet');
+        logger.debug('Add local MediaStream as unmute - no JVB Jingle session started yet');
     }
 
     if (this.p2pJingleSession) {
         addAsUnmutePromises.push(this.p2pJingleSession.addTrackAsUnmute(track));
     } else {
-        logger.info(
-            'Add local MediaStream as unmute -'
-                + ' no P2P Jingle session started yet');
+        logger.debug('Add local MediaStream as unmute - no P2P Jingle session started yet');
     }
 
-    return Promise.all(addAsUnmutePromises);
+    return Promise.allSettled(addAsUnmutePromises)
+        .then(() => {
+            // Signal the video type to the bridge.
+            track.isVideoTrack() && this.rtc.setVideoType(track.videoType);
+        });
 };
 
 /**
@@ -1260,21 +1264,21 @@ JitsiConference.prototype._removeLocalTrackAsMute = function(track) {
     const removeAsMutePromises = [];
 
     if (this.jvbJingleSession) {
-        removeAsMutePromises.push(
-            this.jvbJingleSession.removeTrackAsMute(track));
+        removeAsMutePromises.push(this.jvbJingleSession.removeTrackAsMute(track));
     } else {
-        logger.info(
-            'Remove local MediaStream - no JVB JingleSession started yet');
+        logger.debug('Remove local MediaStream - no JVB JingleSession started yet');
     }
     if (this.p2pJingleSession) {
-        removeAsMutePromises.push(
-            this.p2pJingleSession.removeTrackAsMute(track));
+        removeAsMutePromises.push(this.p2pJingleSession.removeTrackAsMute(track));
     } else {
-        logger.info(
-            'Remove local MediaStream - no P2P JingleSession started yet');
+        logger.debug('Remove local MediaStream - no P2P JingleSession started yet');
     }
 
-    return Promise.all(removeAsMutePromises);
+    return Promise.allSettled(removeAsMutePromises)
+        .then(() => {
+            // Signal the video type to the bridge.
+            track.isVideoTrack() && this.rtc.setVideoType(VideoType.NONE);
+        });
 };
 
 /**
@@ -1925,13 +1929,7 @@ JitsiConference.prototype._onIncomingCallP2P = function(
 
     let rejectReason;
 
-    if (!browser.supportsP2P()) {
-        rejectReason = {
-            reason: 'unsupported-applications',
-            reasonDescription: 'P2P not supported',
-            errorMsg: 'This client does not support P2P connections'
-        };
-    } else if (!this.isP2PEnabled() && !this.isP2PTestModeEnabled()) {
+    if (!this.isP2PEnabled() && !this.isP2PTestModeEnabled()) {
         rejectReason = {
             reason: 'decline',
             reasonDescription: 'P2P disabled',
@@ -2025,7 +2023,7 @@ JitsiConference.prototype._acceptJvbIncomingCall = function(
     try {
         jingleSession.initialize(this.room, this.rtc, {
             ...this.options.config,
-            enableInsertableStreams: this._isE2EEEnabled()
+            enableInsertableStreams: this.isE2EEEnabled()
         });
     } catch (error) {
         GlobalOnErrorHandler.callErrorHandler(error);
@@ -2388,11 +2386,9 @@ JitsiConference.prototype.getMeetingUniqueId = function() {
  * @public (FIXME how to make package local ?)
  */
 JitsiConference.prototype.getActivePeerConnection = function() {
-    if (this.isP2PActive()) {
-        return this.p2pJingleSession.peerconnection;
-    }
+    const session = this.isP2PActive() ? this.p2pJingleSession : this.jvbJingleSession;
 
-    return this.jvbJingleSession ? this.jvbJingleSession.peerconnection : null;
+    return session ? session.peerconnection : null;
 };
 
 /**
@@ -2603,6 +2599,15 @@ JitsiConference.prototype.sendEndpointMessage = function(to, payload) {
 };
 
 /**
+ * Sends local stats via the bridge channel which then forwards to other endpoints selectively.
+ * @param {Object} payload The payload of the message.
+ * @throws NetworkError/InvalidStateError/Error if the operation fails or if there is no data channel created.
+ */
+JitsiConference.prototype.sendEndpointStatsMessage = function(payload) {
+    this.rtc.sendEndpointStatsMessage(payload);
+};
+
+/**
  * Sends a broadcast message via the data channel.
  * @param payload {object} the payload of the message.
  * @throws NetworkError or InvalidStateError or Error if the operation fails.
@@ -2784,7 +2789,7 @@ JitsiConference.prototype._acceptP2PIncomingCall = function(
         this.room,
         this.rtc, {
             ...this.options.config,
-            enableInsertableStreams: this._isE2EEEnabled()
+            enableInsertableStreams: this.isE2EEEnabled()
         });
 
     logger.info('Starting CallStats for P2P connection...');
@@ -3144,7 +3149,7 @@ JitsiConference.prototype._startP2PSession = function(remoteJid) {
         this.room,
         this.rtc, {
             ...this.options.config,
-            enableInsertableStreams: this._isE2EEEnabled()
+            enableInsertableStreams: this.isE2EEEnabled()
         });
 
     logger.info('Starting CallStats for P2P connection...');
@@ -3191,9 +3196,7 @@ JitsiConference.prototype._suspendMediaTransferForJvbConnection = function() {
  * @private
  */
 JitsiConference.prototype._maybeStartOrStopP2P = function(userLeftEvent) {
-    if (!browser.supportsP2P()
-        || !this.isP2PEnabled()
-        || this.isP2PTestModeEnabled()) {
+    if (!this.isP2PEnabled() || this.isP2PTestModeEnabled()) {
         logger.info('Auto P2P disabled');
 
         return;
@@ -3554,7 +3557,7 @@ JitsiConference.prototype._restartMediaSessions = function() {
  *
  * @returns {boolean}
  */
-JitsiConference.prototype._isE2EEEnabled = function() {
+JitsiConference.prototype.isE2EEEnabled = function() {
     return this._e2eEncryption && this._e2eEncryption.isEnabled();
 };
 

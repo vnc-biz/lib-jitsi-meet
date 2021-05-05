@@ -37,15 +37,6 @@ export default class BrowserCapabilities extends BrowserDetection {
     }
 
     /**
-     * Check whether or not the current browser support peer to peer connections
-     * @return {boolean} <tt>true</tt> if p2p is supported or <tt>false</tt>
-     * otherwise.
-     */
-    supportsP2P() {
-        return !this.usesUnifiedPlan();
-    }
-
-    /**
      * Checks if the current browser is Chromium based, that is, it's either
      * Chrome / Chromium or uses it as its engine, but doesn't identify as
      * Chrome.
@@ -146,9 +137,10 @@ export default class BrowserCapabilities extends BrowserDetection {
      */
     supportsCodecPreferences() {
         return this.usesUnifiedPlan()
-            && typeof window.RTCRtpTransceiver !== 'undefined'
-            && Object.keys(window.RTCRtpTransceiver.prototype).indexOf('setCodecPreferences') > -1
-            && Object.keys(RTCRtpSender.prototype).indexOf('getCapabilities') > -1
+            && Boolean(window.RTCRtpTransceiver
+            && window.RTCRtpTransceiver.setCodecPreferences
+            && window.RTCRtpReceiver
+            && window.RTCRtpReceiver.getCapabilities)
 
             // this is not working on Safari because of the following bug
             // https://bugs.webkit.org/show_bug.cgi?id=215567
@@ -188,7 +180,11 @@ export default class BrowserCapabilities extends BrowserDetection {
      */
     supportsReceiverStats() {
         return typeof window.RTCRtpReceiver !== 'undefined'
-            && Object.keys(RTCRtpReceiver.prototype).indexOf('getSynchronizationSources') > -1;
+            && Object.keys(RTCRtpReceiver.prototype).indexOf('getSynchronizationSources') > -1
+
+            // Disable this on Safari because it is reporting 0.000001 as the audio levels for all
+            // remote audio tracks.
+            && !this.isWebKitBased();
     }
 
     /**
@@ -244,33 +240,12 @@ export default class BrowserCapabilities extends BrowserDetection {
     }
 
     /**
-     * Returns whether or not the current browser should be using the new
-     * getUserMedia flow, which utilizes the adapter shim. This method should
-     * be temporary and used while migrating all browsers to use adapter and
-     * the new getUserMedia.
-     *
-     * @returns {boolean}
-     */
-    usesNewGumFlow() {
-        if (this.isCordovaiOS()) {
-            return false;
-        }
-
-        if (this.isChromiumBased() || this.isFirefox() || this.isWebKitBased()) {
-            return true;
-        }
-
-        return false;
-    }
-
-    /**
-     * Checks if the browser uses webrtc-adapter. All browsers using the new
-     * getUserMedia flow.
+     * Checks if the browser uses webrtc-adapter. All browsers except React Native do.
      *
      * @returns {boolean}
      */
     usesAdapter() {
-        return this.usesNewGumFlow();
+        return !this.isReactNative();
     }
 
     /**
