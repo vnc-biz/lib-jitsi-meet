@@ -273,7 +273,7 @@ export default function TraceablePeerConnection(
      * sending SSRC updates on attach/detach and mute/unmute (for video).
      * @type {LocalSdpMunger}
      */
-    this.localSdpMunger = new LocalSdpMunger(this);
+    this.localSdpMunger = new LocalSdpMunger(this, this.rtc.getLocalEndpointId());
 
     /**
      * TracablePeerConnection uses RTC's eventEmitter
@@ -315,14 +315,15 @@ export default function TraceablePeerConnection(
         this.peerconnection.onremovestream
             = event => this._remoteStreamRemoved(event.stream);
     } else {
-        this.peerconnection.ontrack = event => {
-            const stream = event.streams[0];
+        this.onTrack = evt => {
+            const stream = evt.streams[0];
 
-            this._remoteTrackAdded(stream, event.track, event.transceiver);
-            stream.onremovetrack = evt => {
-                this._remoteTrackRemoved(stream, evt.track);
-            };
+            this._remoteTrackAdded(stream, evt.track, evt.transceiver);
+            stream.addEventListener('removetrack', e => {
+                this._remoteTrackRemoved(stream, e.track);
+            });
         };
+        this.peerconnection.addEventListener('track', this.onTrack);
     }
     this.onsignalingstatechange = null;
     this.peerconnection.onsignalingstatechange = event => {
@@ -771,26 +772,42 @@ TraceablePeerConnection.prototype._remoteStreamAdded = function(stream) {
         return;
     }
 
-    // Bind 'addtrack'/'removetrack' event handlers
-    if (browser.isChromiumBased()) {
-        stream.onaddtrack = event => {
-            this._remoteTrackAdded(stream, event.track);
-        };
-        stream.onremovetrack = event => {
-            this._remoteTrackRemoved(stream, event.track);
-        };
+    const _addRemoteTracks = (stream, self) => {
+        // Bind 'addtrack'/'removetrack' event handlers
+        if (browser.isChromiumBased()) {
+            stream.onaddtrack = event => {
+                this._remoteTrackAdded(stream, event.track);
+            };
+            stream.onremovetrack = event => {
+                this._remoteTrackRemoved(stream, event.track);
+            };
+        }
+
+        // Call remoteTrackAdded for each track in the stream
+        const streamAudioTracks = stream.getAudioTracks();
+
+        for (const audioTrack of streamAudioTracks) {
+            this._remoteTrackAdded(stream, audioTrack);
+        }
+        const streamVideoTracks = stream.getVideoTracks();
+
+        for (const videoTrack of streamVideoTracks) {
+            this._remoteTrackAdded(stream, videoTrack);
+        }
     }
 
-    // Call remoteTrackAdded for each track in the stream
-    const streamAudioTracks = stream.getAudioTracks();
-
-    for (const audioTrack of streamAudioTracks) {
-        this._remoteTrackAdded(stream, audioTrack);
-    }
-    const streamVideoTracks = stream.getVideoTracks();
-
-    for (const videoTrack of streamVideoTracks) {
-        this._remoteTrackAdded(stream, videoTrack);
+    if (browser.isCordovaiOS()) {
+       // this is actually a bug in jitsi meet lib implementation
+       // and it magically works everywhere but not in Cordova iOS RTC.
+       // A 'this.peerconnection.onaddstream' event is called actually before the 'setRemoteDescription' success is called,
+       // hence a 'this.remoteDescription.sdp' is not available when we access it in '_remoteTrackAdded'
+       // so we need to add this small delay
+       let self = this;
+       setTimeout(function(stream) {
+           _addRemoteTracks(stream, self)
+       }, 300, stream);
+    } else {
+       _addRemoteTracks(stream, this)
     }
 };
 
@@ -901,7 +918,7 @@ TraceablePeerConnection.prototype._remoteTrackAdded = function(stream, track, tr
         return;
     }
 
-    logger.log(`${this} associated ssrc`, ownerEndpointId, trackSsrc);
+    logger.log(`${this} associated ssrc:${trackSsrc} to endpoint:${ownerEndpointId}`);
 
     const peerMediaInfo
         = this.signalingLayer.getPeerMediaInfo(ownerEndpointId, mediaType);
@@ -953,13 +970,6 @@ TraceablePeerConnection.prototype._createRemoteTrack = function(
     }
 
     const existingTrack = remoteTracksMap.get(mediaType);
-
-    // Delete the existing track and create the new one because of a known bug on Safari.
-    // RTCPeerConnection.ontrack fires when a new remote track is added but MediaStream.onremovetrack doesn't so
-    // it needs to be removed whenever a new track is received for the same endpoint id.
-    if (existingTrack && browser.isWebKitBased()) {
-        this._remoteTrackRemoved(existingTrack.getOriginalStream(), existingTrack.getTrack());
-    }
 
     if (existingTrack && existingTrack.getTrack() === track) {
         // Ignore duplicated event which can originate either from 'onStreamAdded' or 'onTrackAdded'.
@@ -1043,6 +1053,11 @@ TraceablePeerConnection.prototype._remoteTrackRemoved = function(
     const streamId = RTC.getStreamID(stream);
     const trackId = track && RTC.getTrackID(track);
 
+    if (!RTC.isUserStreamById(streamId)) {
+        logger.info(`${this} ignored remote 'stream removed' event for non-user stream id: ${streamId}`);
+
+        return;
+    }
     logger.info(`${this} - remote track removed: ${streamId}, ${trackId}`);
 
     if (!streamId) {
@@ -1515,7 +1530,7 @@ const getters = {
         this.trace('getLocalDescription::preTransform', dumpSDP(desc));
 
         // if we're running on FF, transform to Plan B first.
-        if (browser.usesUnifiedPlan()) {
+        if (browser.usesUnifiedPlan() && !this.isP2P) {
             desc = this.interop.toPlanB(desc);
             this.trace('getLocalDescription::postTransform (Plan B)',
                 dumpSDP(desc));
@@ -1523,7 +1538,7 @@ const getters = {
             desc = this._injectSsrcGroupForUnifiedSimulcast(desc);
             this.trace('getLocalDescription::postTransform (inject ssrc group)',
                 dumpSDP(desc));
-        } else {
+        } else if (browser.usesPlanB()) {
             if (browser.doesVideoMuteByStreamRemove()) {
                 desc = this.localSdpMunger.maybeAddMutedLocalVideoTracksToSDP(desc);
                 logger.debug(
@@ -1557,7 +1572,7 @@ const getters = {
         this.trace('getRemoteDescription::preTransform', dumpSDP(desc));
 
         // if we're running on FF, transform to Plan B first.
-        if (browser.usesUnifiedPlan()) {
+        if (browser.usesUnifiedPlan() && !this.isP2P) {
             desc = this.interop.toPlanB(desc);
             this.trace(
                 'getRemoteDescription::postTransform (Plan B)', dumpSDP(desc));
@@ -1836,7 +1851,7 @@ TraceablePeerConnection.prototype._assertTrackBelongs = function(
  * video in the local SDP.
  */
 TraceablePeerConnection.prototype.getConfiguredVideoCodec = function() {
-    const sdp = this.localDescription.sdp;
+    const sdp = this.peerconnection.localDescription?.sdp;
     const defaultCodec = CodecMimeType.VP8;
 
     if (!sdp) {
@@ -2231,7 +2246,7 @@ TraceablePeerConnection.prototype.setLocalDescription = function(description) {
     if (browser.usesPlanB()) {
         localSdp = this._adjustLocalMediaDirection(localSdp);
         localSdp = this._ensureSimulcastGroupIsLast(localSdp);
-    } else {
+    } else if (!this.isP2P) {
 
         // if we're using unified plan, transform to it first.
         localSdp = this.interop.toUnifiedPlan(localSdp);
@@ -2451,7 +2466,7 @@ TraceablePeerConnection.prototype.setRemoteDescription = function(description) {
 
         // eslint-disable-next-line no-param-reassign
         description = normalizePlanB(description);
-    } else {
+    } else if (!this.isP2P) {
         const currentDescription = this.peerconnection.remoteDescription;
 
         // eslint-disable-next-line no-param-reassign
@@ -2723,10 +2738,9 @@ TraceablePeerConnection.prototype.close = function() {
     this.trace('stop');
 
     // Off SignalingEvents
-    this.signalingLayer.off(
-        SignalingEvents.PEER_MUTED_CHANGED, this._peerMutedChanged);
-    this.signalingLayer.off(
-        SignalingEvents.PEER_VIDEO_TYPE_CHANGED, this._peerVideoTypeChanged);
+    this.signalingLayer.off(SignalingEvents.PEER_MUTED_CHANGED, this._peerMutedChanged);
+    this.signalingLayer.off(SignalingEvents.PEER_VIDEO_TYPE_CHANGED, this._peerVideoTypeChanged);
+    browser.usesUnifiedPlan() && this.peerconnection.removeEventListener('track', this.onTrack);
 
     for (const peerTracks of this.remoteTracks.values()) {
         for (const remoteTrack of peerTracks.values()) {
@@ -2901,23 +2915,9 @@ TraceablePeerConnection.prototype._processLocalSSRCsMap = function(ssrcMap) {
 
             // eslint-disable-next-line no-negated-condition
             if (newSSRCNum !== oldSSRCNum) {
-                if (oldSSRCNum === null) {
-                    logger.info(
-                        `Storing new local SSRC for ${track} in ${this}`,
-                        newSSRC);
-                } else {
-                    logger.error(
-                        `Overwriting SSRC for ${track} ${trackMSID} in ${this
-                        } with: `, newSSRC);
-                }
+                oldSSRCNum && logger.error(`Overwriting SSRC for ${track} ${trackMSID} in ${this} with: `, newSSRC);
                 this.localSSRCs.set(track.rtcId, newSSRC);
-
-                this.eventEmitter.emit(
-                    RTCEvents.LOCAL_TRACK_SSRC_UPDATED, track, newSSRCNum);
-            } else {
-                logger.debug(
-                    `The local SSRC(${newSSRCNum}) for ${track} ${trackMSID}`
-                     + `is still up to date in ${this}`);
+                this.eventEmitter.emit(RTCEvents.LOCAL_TRACK_SSRC_UPDATED, track, newSSRCNum);
             }
         } else if (!track.isVideoTrack() && !track.isMuted()) {
             // It is normal to find no SSRCs for a muted video track in
@@ -3033,5 +3033,5 @@ TraceablePeerConnection.prototype.generateNewStreamSSRCInfo = function(track) {
  * @return {string}
  */
 TraceablePeerConnection.prototype.toString = function() {
-    return `TPC[${this.id},p2p:${this.isP2P}]`;
+    return `TPC[${this.id},${this.isP2P ? 'P2P' : 'JVB'}]`;
 };

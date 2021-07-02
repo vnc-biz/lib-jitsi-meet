@@ -355,8 +355,9 @@ export default class JingleSessionPC extends JingleSession {
 
             // Disable simulcast for low fps screenshare and enable it for high fps screenshare.
             // testing.capScreenshareBitrate config.js setting has now been deprecated.
-            pcOptions.capScreenshareBitrate = !(typeof options.desktopSharingFrameRate?.max === 'number'
-                && options.desktopSharingFrameRate?.max > SS_DEFAULT_FRAME_RATE);
+            pcOptions.capScreenshareBitrate = pcOptions.disableSimulcast
+                || !(typeof options.desktopSharingFrameRate?.max === 'number'
+                    && options.desktopSharingFrameRate?.max > SS_DEFAULT_FRAME_RATE);
 
             // add the capScreenshareBitrate to the permanent properties so that it's included with every event that we
             // send to the analytics backend.
@@ -453,10 +454,7 @@ export default class JingleSessionPC extends JingleSession {
                     `ice.state.${this.peerconnection.iceConnectionState}`]
                     = now;
             }
-            logger.log(
-                `(TIME) ICE ${this.peerconnection.iceConnectionState}`
-                    + ` P2P? ${this.isP2P}:\t`,
-                now);
+            logger.log(`(TIME) ICE ${this.peerconnection.iceConnectionState} ${this.isP2P ? 'P2P' : 'JVB'}:\t`, now);
 
             Statistics.sendAnalytics(
                 ICE_STATE_CHANGED,
@@ -793,8 +791,7 @@ export default class JingleSessionPC extends JingleSession {
             });
 
         if (!iceCandidates.length) {
-            logger.error(
-                'No ICE candidates to add ?', elem[0] && elem[0].outerHTML);
+            logger.error('No ICE candidates to add ?', elem[0] && elem[0].outerHTML);
 
             return;
         }
@@ -815,8 +812,7 @@ export default class JingleSessionPC extends JingleSession {
             logger.debug(`ICE candidates task finished on ${this}`);
         };
 
-        logger.debug(
-            `Queued add (${iceCandidates.length}) ICE candidates task...`);
+        logger.debug(`Queued add (${iceCandidates.length}) ICE candidates task...`);
         this.modificationQueue.push(workFunction);
     }
 
@@ -845,9 +841,7 @@ export default class JingleSessionPC extends JingleSession {
 
                         if (owner && owner.length) {
                             if (isNaN(ssrc) || ssrc < 0) {
-                                logger.warn(
-                                    `Invalid SSRC ${ssrc} value received`
-                                        + ` for ${owner}`);
+                                logger.warn(`Invalid SSRC ${ssrc} value received for ${owner}`);
                             } else {
                                 this.signalingLayer.setSSRCOwner(
                                     ssrc,
@@ -868,8 +862,7 @@ export default class JingleSessionPC extends JingleSession {
         if (this.peerconnection) {
             this.peerconnection.generateRecvonlySsrc();
         } else {
-            logger.error(
-                'Unable to generate recvonly SSRC - no peerconnection');
+            logger.error('Unable to generate recvonly SSRC - no peerconnection');
         }
     }
 
@@ -1244,8 +1237,7 @@ export default class JingleSessionPC extends JingleSession {
         }
         localSDP.toJingle(
             accept,
-            this.initiatorJid === this.localJid ? 'initiator' : 'responder',
-            null);
+            this.initiatorJid === this.localJid ? 'initiator' : 'responder');
 
         // Calling tree() to print something useful
         accept = accept.tree();
@@ -1616,8 +1608,7 @@ export default class JingleSessionPC extends JingleSession {
                 const ssrc = $(this).attr('ssrc');
 
                 if (currentRemoteSdp.containsSSRC(ssrc)) {
-                    logger.warn(
-                        `Source-add request for existing SSRC: ${ssrc}`);
+                    logger.warn(`Source-add request for existing SSRC: ${ssrc}`);
 
                     return;
                 }
@@ -1738,12 +1729,8 @@ export default class JingleSessionPC extends JingleSession {
             }
 
             logger.log(`Processing ${logPrefix}`);
-            logger.log(
-                'ICE connection state: ',
-                this.peerconnection.iceConnectionState);
 
-            const oldLocalSdp
-                = new SDP(this.peerconnection.localDescription.sdp);
+            const oldLocalSdp = new SDP(this.peerconnection.localDescription.sdp);
             const sdp = new SDP(this.peerconnection.remoteDescription.sdp);
             const addOrRemoveSsrcInfo
                 = isAdd
@@ -1759,8 +1746,7 @@ export default class JingleSessionPC extends JingleSession {
                     const newLocalSdp
                         = new SDP(this.peerconnection.localDescription.sdp);
 
-                    logger.log(
-                        `${logPrefix} - OK, SDPs: `, oldLocalSdp, newLocalSdp);
+                    logger.log(`${logPrefix} - OK`);
                     this.notifyMySSRCUpdate(oldLocalSdp, newLocalSdp);
                     finishedCallback();
                 }, error => {
@@ -1827,13 +1813,8 @@ export default class JingleSessionPC extends JingleSession {
                     if (mid > -1) {
                         remoteSdp.media[mid] = remoteSdp.media[mid].replace(`${line}\r\n`, '');
 
-                        // Change the direction to "inactive" only on Firefox. Audio fails on
-                        // Safari (possibly Chrome in unified plan mode) when we try to re-use inactive
-                        // m-lines due to a webkit bug.
-                        // https://bugs.webkit.org/show_bug.cgi?id=211181
-                        if (browser.isFirefox()) {
-                            remoteSdp.media[mid] = remoteSdp.media[mid].replace('a=sendonly', 'a=inactive');
-                        }
+                        // Change the direction to "inactive".
+                        remoteSdp.media[mid] = remoteSdp.media[mid].replace('a=sendonly', 'a=inactive');
                     }
                 });
             }
@@ -1939,8 +1920,7 @@ export default class JingleSessionPC extends JingleSession {
 
                 return this.peerconnection.setLocalDescription(offer)
                     .then(() => {
-                        logger.debug(
-                            'Renegotiate: setting remote description');
+                        logger.debug('Renegotiate: setting remote description');
 
                         // eslint-disable-next-line max-len
                         return this.peerconnection.setRemoteDescription(remoteDescription);
@@ -2153,9 +2133,7 @@ export default class JingleSessionPC extends JingleSession {
         const addedMedia = sdpDiff.getNewMedia();
 
         if (Object.keys(addedMedia).length) {
-            logger.error(
-                `${this} - some SSRC were added on ${operationName}`,
-                addedMedia);
+            logger.error(`${this} - some SSRC were added on ${operationName}`, addedMedia);
 
             return false;
         }
@@ -2164,9 +2142,7 @@ export default class JingleSessionPC extends JingleSession {
         const removedMedia = sdpDiff.getNewMedia();
 
         if (Object.keys(removedMedia).length) {
-            logger.error(
-                `${this} - some SSRCs were removed on ${operationName}`,
-                removedMedia);
+            logger.error(`${this} - some SSRCs were removed on ${operationName}`, removedMedia);
 
             return false;
         }
@@ -2431,8 +2407,7 @@ export default class JingleSessionPC extends JingleSession {
                 || (remoteVideoSenders === 'responder' && !this.isInitiator);
 
         if (isRemoteVideoActive !== this._remoteVideoActive) {
-            logger.debug(
-                `${this} new remote video active: ${isRemoteVideoActive}`);
+            logger.debug(`${this} new remote video active: ${isRemoteVideoActive}`);
             this._remoteVideoActive = isRemoteVideoActive;
         }
 
@@ -2626,8 +2601,7 @@ export default class JingleSessionPC extends JingleSession {
      * @return {string}
      */
     toString() {
-        return `JingleSessionPC[p2p=${this.isP2P},`
-                    + `initiator=${this.isInitiator},sid=${this.sid}]`;
+        return `JingleSessionPC[${this.isP2P ? 'P2P' : 'JVB'},initiator=${this.isInitiator},sid=${this.sid}]`;
     }
 
     /**
